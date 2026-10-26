@@ -15,6 +15,10 @@ com.android.bluetooth
 com.milink.service
 ```
 
+原生提示测试分支另外声明可选作用域 `com.xiaomi.bluetooth`（系统蓝牙扩展）。
+启用“连接时显示”或“耳机电量通知”时需要勾选它，并重启对应宿主进程。
+这两个功能默认关闭，不要求扩大到 System UI 或系统设置。
+
 可选作用域见[厂商控制 App 与 LSPosed 作用域](control-apps.md)。只选择设备上实际安装、
 且确实会用于控制当前耳机的 App；同一品牌存在多个候选包名时，选择实际使用的版本即可。
 控制 App 作用域只安装进程存活 Hook，用于控制权仲裁；不会 Hook 厂商界面、协议实现或

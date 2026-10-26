@@ -115,6 +115,8 @@ class MainActivity : ComponentActivity() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 ModuleContract.ACTION_STATE_CHANGED -> {
+                    if (context == null || !dev.hyperears.bridge.BroadcastIdentity.accepts(
+                            context, sentFromPackage, sentFromUid, ModuleContract.BLUETOOTH_PACKAGE)) return
                     with(ModuleContract) {
                         val state = intent.readState()
                         val token = intent.readSessionToken()

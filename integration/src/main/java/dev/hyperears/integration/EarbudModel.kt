@@ -526,6 +526,7 @@ data class AdapterSnapshot(
     val presentationId: MiLinkCardPresentationId?,
     val transportKinds: Set<TransportKind>,
     val controlApps: List<ControlAppSpec> = emptyList(),
+    val artwork: HeadsetArtwork = HeadsetArtwork.defaultFor(formFactor),
 )
 
 /**

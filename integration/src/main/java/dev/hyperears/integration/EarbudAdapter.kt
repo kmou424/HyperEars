@@ -38,6 +38,9 @@ abstract class EarbudAdapter(
     /** Physical form used by platform presentation bridges. */
     open val formFactor: HeadsetFormFactor = HeadsetFormFactor.TWS
 
+    /** Presentation metadata only; overriding artwork never confirms protocol capabilities. */
+    open val artwork: HeadsetArtwork get() = HeadsetArtwork.defaultFor(formFactor)
+
     open val capabilities: EarbudCapabilities = EarbudCapabilities()
     open val miLinkCardPresentationId: MiLinkCardPresentationId? = null
 
@@ -414,6 +417,7 @@ abstract class EarbudAdapter(
             }
         },
         controlApps = controlApps,
+        artwork = artwork,
     )
 
     fun resetProtocolSession() {

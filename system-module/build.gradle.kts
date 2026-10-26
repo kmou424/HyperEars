@@ -23,7 +23,7 @@ android {
         minSdk = 35
         targetSdk = 36
         versionCode = 20800
-        versionName = "2.8.0"
+        versionName = "2.8.0-native-test"
     }
 
     signingConfigs {

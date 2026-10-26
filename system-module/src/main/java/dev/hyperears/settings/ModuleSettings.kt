@@ -18,6 +18,12 @@ enum class MoreSettingsTarget {
     }
 }
 
+enum class HeadsetConnectionPresentation(val title: String) {
+    OFF("关闭"),
+    SYSTEM_HINT("系统连接提示"),
+    BATTERY_POPUP("电量弹窗"),
+}
+
 /** User-controlled integration, navigation and diagnostics policy. */
 data class ModuleSettings(
     val moreSettingsTarget: MoreSettingsTarget = MoreSettingsTarget.SYSTEM_SETTINGS,
@@ -25,6 +31,8 @@ data class ModuleSettings(
     val modulePaused: Boolean = false,
     val diagnosticLogging: Boolean = false,
     val disabledAdapterIds: Set<String> = emptySet(),
+    val headsetConnectionPresentation: HeadsetConnectionPresentation = HeadsetConnectionPresentation.OFF,
+    val headsetDetailNotification: Boolean = false,
 )
 
 /**
@@ -43,6 +51,8 @@ object ModuleSettingsStore {
     private const val MODULE_PAUSED = "module_paused"
     private const val DIAGNOSTIC_LOGGING = "diagnostic_logging"
     private const val DISABLED_ADAPTER_IDS = "disabled_adapter_ids"
+    private const val HEADSET_CONNECTION_PRESENTATION = "headset_connection_presentation"
+    private const val HEADSET_DETAIL_NOTIFICATION = "headset_detail_notification"
     private const val REMOTE_MIGRATION_COMPLETE = "remote_migration_complete"
     private const val REMOTE_WRITE_PENDING = "remote_write_pending"
 
@@ -51,6 +61,10 @@ object ModuleSettingsStore {
         yieldToVendorControlApp = preferences.getBoolean(YIELD_TO_VENDOR_CONTROL_APP, false),
         modulePaused = preferences.getBoolean(MODULE_PAUSED, false),
         diagnosticLogging = preferences.getBoolean(DIAGNOSTIC_LOGGING, false),
+        headsetConnectionPresentation = runCatching {
+            HeadsetConnectionPresentation.valueOf(preferences.getString(HEADSET_CONNECTION_PRESENTATION, null).orEmpty())
+        }.getOrDefault(HeadsetConnectionPresentation.OFF),
+        headsetDetailNotification = preferences.getBoolean(HEADSET_DETAIL_NOTIFICATION, false),
         disabledAdapterIds = preferences
             .getStringSet(DISABLED_ADAPTER_IDS, emptySet())
             .orEmpty()
@@ -69,6 +83,8 @@ object ModuleSettingsStore {
             .putBoolean(YIELD_TO_VENDOR_CONTROL_APP, settings.yieldToVendorControlApp)
             .putBoolean(MODULE_PAUSED, settings.modulePaused)
             .putBoolean(DIAGNOSTIC_LOGGING, settings.diagnosticLogging)
+            .putString(HEADSET_CONNECTION_PRESENTATION, settings.headsetConnectionPresentation.name)
+            .putBoolean(HEADSET_DETAIL_NOTIFICATION, settings.headsetDetailNotification)
             .putStringSet(DISABLED_ADAPTER_IDS, settings.disabledAdapterIds.toRemotePreferencesSet())
             .commit()
 
@@ -133,6 +149,8 @@ object ModuleSettingsStore {
         MODULE_PAUSED,
         DIAGNOSTIC_LOGGING,
         DISABLED_ADAPTER_IDS,
+        HEADSET_CONNECTION_PRESENTATION,
+        HEADSET_DETAIL_NOTIFICATION,
     )
 }
 

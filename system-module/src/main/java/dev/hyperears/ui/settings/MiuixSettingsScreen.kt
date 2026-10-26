@@ -30,6 +30,10 @@ import dev.hyperears.integration.EarbudAdapterGroup
 import dev.hyperears.root.RootAction
 import dev.hyperears.root.RootActionState
 import dev.hyperears.settings.ModuleSettings
+import dev.hyperears.settings.HeadsetConnectionPresentation
+import dev.hyperears.bridge.BroadcastIdentity
+import dev.hyperears.bridge.NativePresentationContract
+import androidx.compose.ui.platform.LocalContext
 import dev.hyperears.settings.MoreSettingsTarget
 import dev.hyperears.ui.components.MiuixHyperEarsPage
 import dev.hyperears.ui.components.rememberSwitchHaptics
@@ -96,6 +100,30 @@ fun MiuixSettingsScreen(
                         onCheckedChange = {
                             onSettingsChanged(settings.copy(yieldToVendorControlApp = it))
                         },
+                    )
+                }
+            }
+            item(key = "native-presentation-header") {
+                MiuixPreferenceSectionTitle("系统提示")
+            }
+            item(key = "native-presentation-preferences") {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    WindowSpinnerPreference(
+                        items = HeadsetConnectionPresentation.entries.map { DropdownItem(text = it.title) },
+                        selectedIndex = HeadsetConnectionPresentation.entries.indexOf(settings.headsetConnectionPresentation),
+                        title = "连接时显示",
+                        summary = "需勾选 com.xiaomi.bluetooth 作用域。",
+                        onSelectedIndexChange = { index ->
+                            HeadsetConnectionPresentation.entries.getOrNull(index)?.let {
+                                onSettingsChanged(settings.copy(headsetConnectionPresentation = it))
+                            }
+                        },
+                    )
+                    MiuixSwitchPreference(
+                        title = "耳机电量通知",
+                        summary = "在通知栏显示已连接耳机的电量。需勾选 com.xiaomi.bluetooth 作用域。",
+                        checked = settings.headsetDetailNotification,
+                        onCheckedChange = { onSettingsChanged(settings.copy(headsetDetailNotification = it)) },
                     )
                 }
             }
@@ -189,6 +217,7 @@ fun MiuixDebugSettingsScreen(
     onOpenAdapters: () -> Unit,
     onNavigateBack: () -> Unit,
 ) {
+    val context = LocalContext.current
     MiuixHyperEarsPage(title = "调试", onNavigateBack = onNavigateBack) { padding, behavior ->
         LazyColumn(
             state = rememberLazyListState(),
@@ -237,6 +266,16 @@ fun MiuixDebugSettingsScreen(
                             available = rootAvailable == true,
                             running = false,
                             onClick = onExportLogs,
+                        )
+                        MiuixActionPreference(
+                            title = "预览系统连接提示", summary = "使用当前耳机状态，遵循系统显示条件。",
+                            available = !settings.modulePaused, running = false,
+                            onClick = { BroadcastIdentity.send(context, NativePresentationContract.preview("hint")) },
+                        )
+                        MiuixActionPreference(
+                            title = "预览电量弹窗", summary = "查看当前耳机的原生电量窗口。",
+                            available = !settings.modulePaused, running = false,
+                            onClick = { BroadcastIdentity.send(context, NativePresentationContract.preview("popup")) },
                         )
                     }
                 }

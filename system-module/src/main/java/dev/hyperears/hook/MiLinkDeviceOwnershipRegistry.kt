@@ -36,7 +36,7 @@ internal class MiLinkDeviceOwnershipRegistry {
             previous == Owner.SYSTEM -> Owner.SYSTEM
             isNativeAdmissionAccepted(originalResult) -> Owner.SYSTEM
             previous == Owner.HYPEREARS -> Owner.HYPEREARS
-            hyperEarsCandidateAvailable -> Owner.HYPEREARS
+            hyperEarsCandidateAvailable && isNativeAdmissionRejected(originalResult) -> Owner.HYPEREARS
             else -> previous
         }
         owners[key] = next
@@ -74,7 +74,13 @@ internal class MiLinkDeviceOwnershipRegistry {
         /** Supports the Boolean and numeric return shapes used by different MiLink releases. */
         fun isNativeAdmissionAccepted(result: Any?): Boolean = when (result) {
             is Boolean -> result
-            is Number -> result.toLong() > 0L
+            is Number -> result.toLong() == 1L
+            else -> false
+        }
+
+        fun isNativeAdmissionRejected(result: Any?): Boolean = when (result) {
+            is Boolean -> !result
+            is Number -> result.toLong() == 0L
             else -> false
         }
     }

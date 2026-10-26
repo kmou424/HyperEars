@@ -8,6 +8,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import dev.hyperears.bridge.ModuleContract
 import dev.hyperears.bridge.StateBroadcaster
+import dev.hyperears.bridge.BroadcastIdentity
+import dev.hyperears.bridge.NativePresentationContract
 import dev.hyperears.hook.ModuleLog
 import dev.hyperears.integration.EarbudAdapter
 import dev.hyperears.integration.EarbudIdentity
@@ -45,6 +47,10 @@ internal object EarbudSessionService {
         identity: EarbudIdentity,
         adapter: EarbudAdapter,
     ): Boolean = runtime?.connectionManager?.registerDevice(device, identity, adapter) == true
+
+    fun onPhysicalConnected(address: String) {
+        runtime?.connectionManager?.onPhysicalConnected(address)
+    }
 
     fun observeDevice(
         device: BluetoothDevice,
@@ -106,6 +112,8 @@ internal object EarbudSessionService {
                                     targetPackage = target,
                                     state = snapshot.state,
                                     sessionToken = snapshot.sessionToken,
+                                    presentation = snapshot.presentation,
+                                    producer = connectionManager.presentationProducer,
                                 )
                             }
                         }
@@ -161,6 +169,13 @@ internal object EarbudSessionService {
                         }
                     }
 
+                    NativePresentationContract.ACTION_ADMISSION -> {
+                        if (!BroadcastIdentity.accepts(context, sentFromPackage, sentFromUid,
+                                ModuleContract.MILINK_PACKAGE)) return
+                        val (address, token) = NativePresentationContract.readAdmission(intent) ?: return
+                        connectionManager.confirmNativeAdmission(address, token)
+                    }
+
                     ModuleContract.ACTION_SYSTEM_OWNERSHIP_CLAIMED -> {
                         val address = with(ModuleContract) {
                             intent.readSystemOwnershipClaimAddress()
@@ -199,6 +214,7 @@ internal object EarbudSessionService {
                 addAction(ModuleContract.ACTION_CONTROL)
                 addAction(ModuleContract.ACTION_CONTROL_APP_REGISTER)
                 addAction(ModuleContract.ACTION_SYSTEM_OWNERSHIP_CLAIMED)
+                addAction(NativePresentationContract.ACTION_ADMISSION)
                 addAction(BluetoothSystemBattery.ACTION_LEVEL_CHANGED)
             }
             context.registerReceiver(

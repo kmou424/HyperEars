@@ -138,6 +138,9 @@ com.android.bluetooth
 com.milink.service
 ```
 
+原生提示测试分支还声明 `com.xiaomi.bluetooth`，用于系统耳机窗口、连接提示和电量通知。
+它是可选的系统展示宿主，不是厂商控制 App，也不参与品牌判型。相关功能默认关闭。
+
 厂商控制 App 是可选作用域。推荐配置顺序：
 
 1. 先启用两个核心作用域；

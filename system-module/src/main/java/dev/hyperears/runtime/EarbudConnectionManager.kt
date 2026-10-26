@@ -3,6 +3,8 @@ package dev.hyperears.runtime
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.content.Context
+import android.os.Binder
+import android.os.SystemClock
 import dev.hyperears.bridge.StateBroadcaster
 import dev.hyperears.hook.ModuleLog
 import dev.hyperears.hook.maskBluetoothAddress
@@ -17,6 +19,9 @@ import dev.hyperears.integration.PrivateTransportState
 import dev.hyperears.integration.ProtocolHandshakeState
 import dev.hyperears.integration.SystemProfileState
 import dev.hyperears.integration.TransportReadiness
+import dev.hyperears.presentation.HeadsetConnection
+import dev.hyperears.presentation.NativeAdmission
+import dev.hyperears.presentation.NativePresentationMetadata
 import java.io.Closeable
 import java.util.Locale
 import java.util.UUID
@@ -34,6 +39,7 @@ internal class EarbudConnectionManager(
     data class Snapshot(
         val state: EarbudState,
         val sessionToken: String,
+        val presentation: NativePresentationMetadata? = null,
     )
 
     private data class SessionRecord(
@@ -74,6 +80,38 @@ internal class EarbudConnectionManager(
     private val lastRevisions = mutableMapOf<String, Long>()
     private val systemOwnedAddresses = mutableSetOf<String>()
     private val connectionCoordinator = ConnectionAttemptCoordinator()
+    val presentationProducer = Binder()
+    private val physicalConnections = mutableMapOf<String, HeadsetConnection>()
+    private val presentationAdmissions = mutableMapOf<String, NativeAdmission>()
+
+    fun onPhysicalConnected(address: String) = synchronized(lifecycleLock) {
+        if (!closed) physicalConnections.getOrPut(normalizeAddress(address)) {
+            HeadsetConnection(UUID.randomUUID().toString(), SystemClock.elapsedRealtime())
+        }
+    }
+
+    /** Only an authenticated MiLink receipt for this exact live session can grant presentation. */
+    fun confirmNativeAdmission(address: String, token: String) {
+        val next = synchronized(lifecycleLock) {
+            val key = normalizeAddress(address)
+            val record = sessions[key]?.takeIf { it.token == token } ?: return
+            if (closed || modulePaused || key in systemOwnedAddresses || !record.state.sessionActive) return
+            if (presentationAdmissions[key] == NativeAdmission.HYPEREARS) return
+            presentationAdmissions[key] = NativeAdmission.HYPEREARS
+            record.state = record.state.copy(revision = record.state.revision + 1)
+            lastRevisions[key] = record.state.revision
+            snapshotLocked(record.state, record.token).also { knownDevices[key] = it }
+        }
+        publish(next)
+    }
+
+    private fun snapshotLocked(state: EarbudState, token: String): Snapshot {
+        val key = state.address?.let(::normalizeAddress)
+        val connection = physicalConnections[key] ?: knownDevices[key]?.presentation?.connection
+        return Snapshot(state, token, connection?.let {
+            NativePresentationMetadata(it, presentationAdmissions[key] ?: NativeAdmission.UNKNOWN)
+        })
+    }
 
     private var activeControlAppPackages: Set<String> = emptySet()
     private var externalControlEnabled = true
@@ -146,8 +184,9 @@ internal class EarbudConnectionManager(
                     state = state,
                 )
                 sessions[key] = record
+                presentationAdmissions[key] = NativeAdmission.UNKNOWN
                 lastRevisions[key] = state.revision
-                knownDevices[key] = Snapshot(state, record.token)
+                knownDevices[key] = snapshotLocked(state, record.token)
                 Registration.Created(record)
             }
         }
@@ -199,7 +238,15 @@ internal class EarbudConnectionManager(
             } else {
                 observedDevices.remove(normalizeAddress(address))
             }
-            removeLocked(address)
+            removeLocked(address).also {
+                if (address == null) {
+                    physicalConnections.clear()
+                    presentationAdmissions.clear()
+                } else {
+                    physicalConnections.remove(normalizeAddress(address))
+                    presentationAdmissions.remove(normalizeAddress(address))
+                }
+            }
         }
         finishRemovals(removals)
         return removals.isNotEmpty()
@@ -216,6 +263,7 @@ internal class EarbudConnectionManager(
         val result = synchronized(lifecycleLock) {
             if (closed) return false
             val newlyClaimed = systemOwnedAddresses.add(key)
+            presentationAdmissions[key] = NativeAdmission.SYSTEM
             observedDevices.remove(key)
             newlyClaimed to removeLocked(address)
         }
@@ -371,7 +419,7 @@ internal class EarbudConnectionManager(
             val next = projected.copy(revision = previous.revision + 1)
             record.state = next
             lastRevisions[key] = next.revision
-            Snapshot(next, record.token).also {
+            snapshotLocked(next, record.token).also {
                 knownDevices[key] = it
             }
         }
@@ -408,7 +456,7 @@ internal class EarbudConnectionManager(
             )
             record.state = ended
             lastRevisions[key] = ended.revision
-            val finalSnapshot = Snapshot(ended, record.token)
+            val finalSnapshot = snapshotLocked(ended, record.token)
             knownDevices[key] = finalSnapshot
             Removal(record, finalSnapshot)
         }
@@ -426,7 +474,7 @@ internal class EarbudConnectionManager(
     }
 
     private fun publish(record: SessionRecord) {
-        publish(Snapshot(record.state, record.token))
+        publish(synchronized(lifecycleLock) { snapshotLocked(record.state, record.token) })
     }
 
     private fun publish(snapshot: Snapshot) {
@@ -434,6 +482,8 @@ internal class EarbudConnectionManager(
             appContext,
             snapshot.state,
             snapshot.sessionToken,
+            snapshot.presentation,
+            presentationProducer,
         )
         val state = snapshot.state
         val featureSummary = state.features.values.joinToString(

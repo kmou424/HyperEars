@@ -51,6 +51,9 @@ node tools/validate-docs.mjs
     `requestState(featureId, delayMs)`；达到接受条件时声明 `cancelStateRequest(featureId)`。
     Android 会话只机械执行有序 `AdapterEffect`，不得保存型号目标、重试次数或接受策略；
     WireCodec、ProtocolSession、MiLink Hook 和 UI 中不得按型号休眠或建立常驻轮询。
+13. 原生展示图片通过 Adapter 的 `artwork` 声明，具体型号继承或覆盖家族资源。
+    资源 ID、能力证据和系统设备身份互相独立。新增图片须遵循
+    [展示资源规范](docs/headset-artwork.md)，不得把 Android 资源加载放入协议层。
 
 新增或变更厂商控制 App 时，还必须同步更新 `ControlAppCatalog`、对应 Adapter 的
 `controlApps`、`META-INF/xposed/scope.list` 和

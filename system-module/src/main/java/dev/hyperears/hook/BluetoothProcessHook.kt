@@ -77,6 +77,7 @@ internal class BluetoothProcessHook : HookContext() {
             return
         }
         if (state != BluetoothProfile.STATE_CONNECTED) return
+        runCatching { device.address }.getOrNull()?.let(EarbudSessionService::onPhysicalConnected)
         if (ModuleRuntimeGate.paused) return
 
         val identity = device.toEarbudIdentity()

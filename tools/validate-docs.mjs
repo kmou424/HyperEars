@@ -122,7 +122,7 @@ const controlApps = [...catalogSource.matchAll(controlAppPattern)].map((match) =
   packageName: match[2],
   displayName: match[3],
 }));
-const coreScopes = new Set(["com.android.bluetooth", "com.milink.service"]);
+const coreScopes = new Set(["com.android.bluetooth", "com.milink.service", "com.xiaomi.bluetooth"]);
 const declaredScopes = new Set(
   readFileSync(scopePath, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
 );
