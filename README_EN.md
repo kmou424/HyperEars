@@ -23,6 +23,11 @@ StarRing, ROSESELSA, NiceHCK, MOONDROP, Honor, Huawei, QCY, Sony and Samsung dev
 
 ### System integration
 
+- Adds native connection popups and island hints. Smart mode is selected by default and uses the
+  system's scene check to choose a popup on the home screen or an island hint inside other apps.
+  Popup only, Island only and Off are also available.
+- Provides an independent battery notification with device details and the native disconnect action.
+  These displays require the `com.xiaomi.bluetooth` scope; the hardware test baseline is HyperOS 4.
 - Publishes eligible third-party headsets to the MiLink device center for device handoff and system volume.
 - Provides the same handoff and volume path to standard A2DP/HFP headsets, with Android aggregate-battery fallback.
 
@@ -64,6 +69,7 @@ need vendor telemetry and remain bound to the corresponding device session.
 - Xiaomi HyperOS on Android 15 or newer;
 - LSPosed API 101 or newer;
 - required LSPosed scopes are `com.android.bluetooth` and `com.milink.service`;
+- native connection displays and battery notifications also require `com.xiaomi.bluetooth`;
 - to enable runtime yielding, also select the matching installed package from the
   [controller-app catalog](docs/control-apps.md); opening an installed controller from “More
   settings” does not by itself require that optional scope;
@@ -113,7 +119,8 @@ maintained in the [compatibility matrix](docs/compatibility.md).
    [Releases](https://github.com/silverpoetry/HyperEars/releases).
 2. Verify the SHA-256 digest.
 3. Install the APK, enable HyperEars in LSPosed and select at least `com.android.bluetooth` and
-   `com.milink.service`. If runtime yielding is needed, also select the matching installed package
+   `com.milink.service`. Also select `com.xiaomi.bluetooth` for native connection displays or battery
+   notifications. If runtime yielding is needed, select the matching installed package
    from the [controller-app catalog](docs/control-apps.md); do not select Settings, System UI or
    every application.
 4. Reboot the device, pair/connect the headset and inspect the HyperEars dashboard.

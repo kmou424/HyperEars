@@ -24,6 +24,10 @@ vivo / iQOO、OPPO Enco、Technics、Bose、Edifier、StarRing、ROSESELSA、Nic
 
 - 将符合条件的第三方耳机接入 MiLink 融合设备中心，提供设备流转和系统音量。
 - 对没有私有协议适配的标准 A2DP/HFP 耳机，提供同样的流转、音量和 Android 系统整机电量回退。
+- 连接时可显示系统电量弹窗或超级岛；默认“智能”按系统判断在桌面显示弹窗、在应用内显示
+  超级岛，也可选仅弹窗、仅超级岛或关闭。
+- 可独立开启耳机电量通知，查看当前电量、打开系统设备详情或断开连接。
+  新增展示需勾选 `com.xiaomi.bluetooth` 作用域，实机基线为 HyperOS 4。
 
 ### 设备能力
 
@@ -92,6 +96,7 @@ FitBuds Turbo 的实测证据来自贡献者原版实现；维护后的共享卡
 - Xiaomi HyperOS，Android 15 或更高版本；
 - 已安装并正常工作的 LSPosed，API 版本不低于 101；
 - LSPosed 必选作用域：`com.android.bluetooth`、`com.milink.service`；
+- 使用连接弹窗、超级岛或电量通知时，另需 `com.xiaomi.bluetooth`；
 - 如果要启用“运行时退避”，还需按
   [控制 App 目录](docs/control-apps.md#2-当前目录)勾选实际安装并使用的控制 App；仅执行
   “更多设置”厂商 App 跳转时，安装且可启动即可；
@@ -111,7 +116,8 @@ FitBuds Turbo 的实测证据来自贡献者原版实现；维护后的共享卡
    ```
 
 3. 安装 APK，在 LSPosed 中启用 HyperEars，并至少确认 `com.android.bluetooth` 和
-   `com.milink.service` 已选中。若使用厂商控制 App 退避，再按
+   `com.milink.service` 已选中。使用连接展示或电量通知时勾选 `com.xiaomi.bluetooth`。
+   若使用厂商控制 App 退避，再按
    [控制 App 目录](docs/control-apps.md#2-当前目录)选择对应且已安装的包名；不要选择
    Settings、System UI 或所有应用。
 4. 重启设备。仅强停 MiLink 不一定会让两个目标进程同时重新加载模块。

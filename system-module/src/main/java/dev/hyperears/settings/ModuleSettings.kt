@@ -19,9 +19,17 @@ enum class MoreSettingsTarget {
 }
 
 enum class HeadsetConnectionPresentation(val title: String) {
+    SMART("智能"),
+    BATTERY_POPUP("仅弹窗"),
+    SYSTEM_HINT("仅超级岛"),
     OFF("关闭"),
-    SYSTEM_HINT("系统连接提示"),
-    BATTERY_POPUP("电量弹窗"),
+    ;
+
+    companion object {
+        // Persist names, not menu positions: existing explicit selections survive upgrades.
+        fun fromStoredValue(value: String?): HeadsetConnectionPresentation =
+            entries.firstOrNull { it.name == value } ?: SMART
+    }
 }
 
 /** User-controlled integration, navigation and diagnostics policy. */
@@ -31,7 +39,7 @@ data class ModuleSettings(
     val modulePaused: Boolean = false,
     val diagnosticLogging: Boolean = false,
     val disabledAdapterIds: Set<String> = emptySet(),
-    val headsetConnectionPresentation: HeadsetConnectionPresentation = HeadsetConnectionPresentation.OFF,
+    val headsetConnectionPresentation: HeadsetConnectionPresentation = HeadsetConnectionPresentation.SMART,
     val headsetDetailNotification: Boolean = false,
 )
 
@@ -61,9 +69,9 @@ object ModuleSettingsStore {
         yieldToVendorControlApp = preferences.getBoolean(YIELD_TO_VENDOR_CONTROL_APP, false),
         modulePaused = preferences.getBoolean(MODULE_PAUSED, false),
         diagnosticLogging = preferences.getBoolean(DIAGNOSTIC_LOGGING, false),
-        headsetConnectionPresentation = runCatching {
-            HeadsetConnectionPresentation.valueOf(preferences.getString(HEADSET_CONNECTION_PRESENTATION, null).orEmpty())
-        }.getOrDefault(HeadsetConnectionPresentation.OFF),
+        headsetConnectionPresentation = HeadsetConnectionPresentation.fromStoredValue(
+            preferences.getString(HEADSET_CONNECTION_PRESENTATION, null),
+        ),
         headsetDetailNotification = preferences.getBoolean(HEADSET_DETAIL_NOTIFICATION, false),
         disabledAdapterIds = preferences
             .getStringSet(DISABLED_ADAPTER_IDS, emptySet())

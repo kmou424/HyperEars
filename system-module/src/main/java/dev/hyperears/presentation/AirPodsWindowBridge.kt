@@ -15,6 +15,7 @@ import android.os.IBinder
 import android.os.IInterface
 import android.os.Looper
 import android.os.RemoteException
+import android.view.View
 import dev.hyperears.bridge.ModuleContract
 import dev.hyperears.bridge.NativePresentationContract
 import dev.hyperears.hook.HookContext
@@ -52,6 +53,7 @@ internal class AirPodsWindowBridge(
         var active = true
         var bound = false
         var callback: Any? = null
+        var caseVisibilityDisabled = false
         lateinit var binder: Binder
         lateinit var death: IBinder.DeathRecipient
     }
@@ -193,8 +195,34 @@ internal class AirPodsWindowBridge(
             val binding = controllers[chain.thisObject]
             try { chain.proceed() } finally { binding?.let(::release) }
         }
+        installCaseVisibility()
         enabled = true
         ModuleLog.debug(TAG, "native window semantic hooks ready")
+    }
+
+    private fun installCaseVisibility() {
+        runCatching {
+            val visibility = NativeCaseVisibility.resolve(controllerType, appClassLoader)
+            hookAfter(visibility.render) {
+                val binding = controllers[instance] ?: return@hookAfter
+                if (!binding.active || binding.activity.isFinishing || binding.caseVisibilityDisabled) return@hookAfter
+                runCatching {
+                    val root = args[0] as? View ?: return@runCatching
+                    if (root !== NativeMembers.get(binding.controller, "mView")) return@runCatching
+                    val p = projection(binding)
+                    if (p.singleBattery) return@runCatching
+                    if (visibility.apply(root, p.showCaseInPopup)) {
+                        ModuleLog.debug(TAG) {
+                            "case visibility=${p.showCaseInPopup} battery=${p.chargingCase.percent} " +
+                                "charging=${p.chargingCase.charging} revision=${binding.state.revision}"
+                        }
+                    }
+                }.onFailure {
+                    binding.caseVisibilityDisabled = true
+                    ModuleLog.warn(TAG, "native case layout incompatible; retaining native rendering", it)
+                }
+            }
+        }.onFailure { ModuleLog.warn(TAG, "native case visibility extension unavailable", it) }
     }
 
     fun update(state: EarbudState, session: String, metadata: NativePresentationMetadata, producer: IBinder) {

@@ -9,7 +9,6 @@ internal object NativeDetailNotificationResolver {
         val create: Method,
         val cancel: Method,
         val support: Method,
-        val deleteIntent: Method,
         val notificationType: Method,
     )
 
@@ -45,14 +44,6 @@ internal object NativeDetailNotificationResolver {
                     usingEqStrings("feature")
                 }
             })
-            val delete = unique(dex.findMethod {
-                matcher {
-                    declaredClass = owner
-                    returnType = "android.app.PendingIntent"
-                    paramTypes("android.content.Context", "android.bluetooth.BluetoothDevice")
-                    usingEqStrings("android.bluetooth.device.extra.DEVICE")
-                }
-            })
             val type = unique(dex.findMethod {
                 searchPackages("com.android.bluetooth.ble.app")
                 matcher {
@@ -61,7 +52,7 @@ internal object NativeDetailNotificationResolver {
                     usingEqStrings("getNotifyType deviceId=", "show_new_notification_type")
                 }
             })
-            Methods(create, cancel, support, delete, type)
+            Methods(create, cancel, support, type)
         }
     }
 }

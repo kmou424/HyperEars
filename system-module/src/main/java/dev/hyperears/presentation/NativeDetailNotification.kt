@@ -1,11 +1,9 @@
 package dev.hyperears.presentation
 
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.bluetooth.BluetoothDevice
 import android.content.Context
 import android.content.Intent
-import dev.hyperears.bridge.ModuleContract
 import dev.hyperears.bridge.BluetoothDeviceSettings
 import dev.hyperears.hook.HookContext
 import dev.hyperears.hook.ModuleLog
@@ -20,7 +18,6 @@ internal class NativeDetailNotification(
         val connection: String, val postedAt: Long)
     private val current = ThreadLocal<NativeHeadsetProjection?>()
     private val entries = ConcurrentHashMap<String, Entry>()
-    private val dismissed = ConcurrentHashMap<String, String>()
     private val notifications = context.getSystemService(NotificationManager::class.java)
 
     override fun install() {
@@ -29,14 +26,6 @@ internal class NativeDetailNotification(
         }
         hookBefore(methods.notificationType) {
             current.get()?.takeIf { it.singleBattery }?.let { result = "singlebatteryheadset" }
-        }
-        hookBefore(methods.deleteIntent) {
-            val p = current.get() ?: return@hookBefore
-            if ((args[1] as? BluetoothDevice)?.address != p.address) return@hookBefore
-            result = PendingIntent.getBroadcast(context, 0,
-                Intent(ACTION_DISMISSED).setPackage(ModuleContract.NATIVE_HEADSET_PACKAGE)
-                    .setIdentifier("HyperEars:${p.address}").putExtra(BluetoothDevice.EXTRA_DEVICE, args[1] as BluetoothDevice),
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         }
         val click = findMethod("com.android.bluetooth.ble.app.headset.BluetoothHeadsetService\$HeadSetReceiver",
             "onReceive", Context::class.java, Intent::class.java)
@@ -51,11 +40,13 @@ internal class NativeDetailNotification(
     }
 
     fun update(p: NativeHeadsetProjection, device: BluetoothDevice, connection: String) {
-        if (!p.hasBattery || dismissed[p.address] == connection) return
+        if (!p.hasBattery) return
         val old = entries[p.address]
-        if (old?.projection == p && old.connection == connection) return
         val existing = notification(p.address)
         if (existing != null && (old == null || existing.postTime != old.postedAt)) return
+        // Keep the native delete action. A cleared notification can be posted by a later report,
+        // including one with the same battery values; only a still-visible copy is deduplicated.
+        if (existing != null && old?.projection == p && old.connection == connection) return
         withProjection(p) {
             val values = if (p.singleBattery) intArrayOf(127, p.left.percent ?: 127, 127)
             else intArrayOf(p.left.percent ?: 127, p.right.percent ?: 127, p.chargingCase.percent ?: 127)
@@ -64,11 +55,6 @@ internal class NativeDetailNotification(
         val posted = notification(p.address) ?: return
         entries[p.address] = Entry(device, p, connection, posted.postTime)
         ModuleLog.debug("NativeDetail", "published revision of native battery notification")
-    }
-
-    fun dismiss(address: String) {
-        entries[address]?.let { dismissed[address] = it.connection }
-        remove(address, systemOwned = false)
     }
 
     fun remove(address: String, systemOwned: Boolean) {
@@ -83,7 +69,6 @@ internal class NativeDetailNotification(
 
     fun clear() {
         entries.keys.toList().forEach { remove(it, false) }
-        dismissed.clear()
     }
 
     private fun notification(address: String) = notifications.activeNotifications
@@ -96,7 +81,6 @@ internal class NativeDetailNotification(
     }
 
     companion object {
-        const val ACTION_DISMISSED = "dev.hyperears.action.NATIVE_NOTIFICATION_DISMISSED"
         private const val NOTIFICATION_ID = 10003
         private fun tag(address: String) = "BTHeadset$address"
     }

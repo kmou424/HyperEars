@@ -4,6 +4,7 @@
     <string-array name="xposed_scope">
         <item>com.android.bluetooth</item>
         <item>com.milink.service</item>
+        <item>com.xiaomi.bluetooth</item>
         <item>com.vivo.vivotws</item>
         <item>com.heytap.headset</item>
         <item>com.oplus.melody</item>

@@ -48,6 +48,7 @@ internal class NativePresentationRuntime(
     private var windowBridge: AirPodsWindowBridge? = null
     private var windowAttempted = false
     private var popupCompatible = false
+    private var scene: NativePresentationScene? = null
     private var hint: NativeConnectionHint? = null
     private var details: NativeDetailNotification? = null
     private var detailResolutionStarted = false
@@ -92,12 +93,6 @@ internal class NativePresentationRuntime(
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
         }, Context.RECEIVER_EXPORTED)
-        if (!uiProcess) context.registerReceiver(object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
-                    ?.address?.let { runCatching { details?.dismiss(it) } }
-            }
-        }, IntentFilter(NativeDetailNotification.ACTION_DISMISSED), Context.RECEIVER_NOT_EXPORTED)
         ModuleSettingsRuntime.observe { updated -> handler.post {
             val old = settings
             settings = updated
@@ -118,15 +113,20 @@ internal class NativePresentationRuntime(
         if (windowAttempted) return
         if (runCatching { Class.forName(AirPodsWindowBridge.CONTROLLER, false, loader) }.isFailure) return
         windowAttempted = true
+        if (!uiProcess) {
+            runCatching { NativePresentationScene.resolve(loader) }
+                .onSuccess { scene = it }
+                .onFailure { ModuleLog.warn(TAG, "native scene query unavailable", it) }
+        }
         popupCompatible = runCatching { AirPodsWindowSymbols(loader) }.isSuccess
         if (!popupCompatible) {
             ModuleLog.debug(TAG, "popup contract unavailable for loaded plugin")
-            return
         }
         if (!uiProcess) {
             records.values.toList().forEach { render(it, allowTransient = true) }
             return
         }
+        if (!popupCompatible) return
         runCatching {
             AirPodsWindowBridge(context,
                 onOpened = { id, token -> sendWindowEvent(id, token) },
@@ -231,13 +231,15 @@ internal class NativePresentationRuntime(
     private fun render(record: Record, allowTransient: Boolean) {
         if (uiProcess || settings.modulePaused) return
         val p = NativeHeadsetProjection.from(record.state) ?: return
-        if (record.metadata.replay) gate.consume(record.metadata, SystemClock.elapsedRealtime())
+        if (record.metadata.replay) gate.tryPresent(record.metadata, SystemClock.elapsedRealtime()) { false }
         if (record.metadata.admission != NativeAdmission.HYPEREARS) return
         val device = context.getSystemService(BluetoothManager::class.java)?.adapter?.getRemoteDevice(p.address) ?: return
-        if (settings.headsetDetailNotification) details?.update(p, device, record.metadata.connection.id)
+        if (settings.headsetDetailNotification) {
+            runCatching { details?.update(p, device, record.metadata.connection.id) }
+                .onFailure { ModuleLog.warn(TAG, "detail notification update failed", it) }
+        }
         if (!allowTransient || settings.headsetConnectionPresentation == HeadsetConnectionPresentation.OFF) return
-        if (settings.headsetConnectionPresentation == HeadsetConnectionPresentation.BATTERY_POPUP && !popupCompatible) return
-        if (gate.consume(record.metadata, SystemClock.elapsedRealtime())) {
+        gate.tryPresent(record.metadata, SystemClock.elapsedRealtime()) {
             present(record, settings.headsetConnectionPresentation)
         }
     }
@@ -256,37 +258,47 @@ internal class NativePresentationRuntime(
     }
 
     @SuppressLint("MissingPermission")
-    private fun present(record: Record, mode: HeadsetConnectionPresentation) {
-        if (settings.modulePaused) return
-        val p = NativeHeadsetProjection.from(record.state) ?: return
+    private fun present(record: Record, mode: HeadsetConnectionPresentation): Boolean {
+        if (settings.modulePaused || mode == HeadsetConnectionPresentation.OFF) return false
+        val p = NativeHeadsetProjection.from(record.state) ?: return false
         val power = context.getSystemService(PowerManager::class.java)
         val keyguard = context.getSystemService(KeyguardManager::class.java)
         val user = context.getSystemService(UserManager::class.java)
-        // Native Activity stores a wall-clock timestamp and a textual owner tag, respectively.
-        val busy = Settings.Global.getLong(context.contentResolver, "fast_connect_show_dialog", 0L) != 0L ||
-            !Settings.Global.getString(context.contentResolver, "miui_nearby_show_dialog").isNullOrEmpty()
+        // fast_connect_show_dialog is also written by ignorePairDialog/pairing paths without a UI.
+        // The native owner tag and per-device flow record represent presentation occupancy.
+        val busy = !Settings.Global.getString(context.contentResolver, "miui_nearby_show_dialog").isNullOrEmpty()
         if (!user.isUserUnlocked || !user.isUserForeground || !power.isInteractive ||
             keyguard.isKeyguardLocked || busy || activeWindow != null) {
-            ModuleLog.debug(TAG, "presentation skipped: screen, lock or native window owns display")
-            return
+            ModuleLog.debug(TAG, "presentation skipped: unlocked=${user.isUserUnlocked} " +
+                "foreground=${user.isUserForeground} interactive=${power.isInteractive} " +
+                "locked=${keyguard.isKeyguardLocked} nativeWindow=$busy ownWindow=${activeWindow != null}")
+            return false
         }
         if (Settings.Global.getInt(context.contentResolver, "miui_disable_fast_connect_bt_off", 1) != 0) {
             ModuleLog.debug(TAG, "presentation skipped: native FastConnect disabled")
-            return
+            return false
         }
-        val device = context.getSystemService(BluetoothManager::class.java)?.adapter?.getRemoteDevice(p.address) ?: return
-        if (BluetoothDevice::class.java.getMethod("isConnected").invoke(device) != true) return
+        val device = context.getSystemService(BluetoothManager::class.java)?.adapter?.getRemoteDevice(p.address) ?: return false
+        if (BluetoothDevice::class.java.getMethod("isConnected").invoke(device) != true) return false
         if (hint?.flowOwnsPresentation(device) != false) {
             ModuleLog.debug(TAG, "presentation skipped: native circulation owns display")
-            return
+            return false
         }
-        when (mode) {
-            HeadsetConnectionPresentation.OFF -> Unit
-            HeadsetConnectionPresentation.SYSTEM_HINT -> hint?.show(p, device)
-            HeadsetConnectionPresentation.BATTERY_POPUP -> {
+        val onHomeOrCoverScreen = if (mode == HeadsetConnectionPresentation.SMART) {
+            runCatching { scene?.isOnHomeOrCoverScreen(context) }
+                .onFailure { ModuleLog.warn(TAG, "native scene query failed", it) }.getOrNull()
+        } else null
+        val target = resolveNativePresentationTarget(mode, onHomeOrCoverScreen) ?: run {
+            ModuleLog.debug(TAG, "presentation skipped: native scene unavailable")
+            return false
+        }
+        ModuleLog.debug(TAG, "selected target=$target mode=$mode home=$onHomeOrCoverScreen")
+        return when (target) {
+            NativePresentationTarget.ISLAND -> hint?.show(p, device) == true
+            NativePresentationTarget.POPUP -> {
                 if (!popupCompatible) {
                     ModuleLog.debug(TAG, "popup unavailable: host contract not ready")
-                    return
+                    return false
                 }
                 val id = UUID.randomUUID().toString()
                 activeWindow = id
@@ -294,10 +306,15 @@ internal class NativePresentationRuntime(
                     .also { handler.postDelayed(it, 5_000) }
                 runCatching { NativeWindowRequest.launch(context,
                     NativeWindowRequest(id, record.state, record.session, record.metadata, record.producer), device)
-                }.onFailure { releaseWindow(); ModuleLog.warn(TAG, "popup launch failed", it) }
+                }.getOrElse {
+                    releaseWindow()
+                    ModuleLog.warn(TAG, "popup launch failed", it)
+                    return false
+                }
                 BroadcastIdentity.send(context,
                     ModuleContract.control(StandardControlRequest.Refresh, p.address, record.session))
                 ModuleLog.debug(TAG, "popup submitted address=${maskBluetoothAddress(p.address)}")
+                true
             }
         }
     }

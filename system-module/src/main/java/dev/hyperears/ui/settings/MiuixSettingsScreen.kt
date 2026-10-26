@@ -112,7 +112,7 @@ fun MiuixSettingsScreen(
                         items = HeadsetConnectionPresentation.entries.map { DropdownItem(text = it.title) },
                         selectedIndex = HeadsetConnectionPresentation.entries.indexOf(settings.headsetConnectionPresentation),
                         title = "连接时显示",
-                        summary = "需勾选 com.xiaomi.bluetooth 作用域。",
+                        summary = "智能：桌面弹窗，应用内超级岛。需勾选 com.xiaomi.bluetooth 作用域。",
                         onSelectedIndexChange = { index ->
                             HeadsetConnectionPresentation.entries.getOrNull(index)?.let {
                                 onSettingsChanged(settings.copy(headsetConnectionPresentation = it))
@@ -268,7 +268,7 @@ fun MiuixDebugSettingsScreen(
                             onClick = onExportLogs,
                         )
                         MiuixActionPreference(
-                            title = "预览系统连接提示", summary = "使用当前耳机状态，遵循系统显示条件。",
+                            title = "预览超级岛", summary = "显示当前耳机的连接提示。",
                             available = !settings.modulePaused, running = false,
                             onClick = { BroadcastIdentity.send(context, NativePresentationContract.preview("hint")) },
                         )

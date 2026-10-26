@@ -5,6 +5,7 @@ import dev.hyperears.integration.BatterySource
 import dev.hyperears.integration.EarbudState
 import dev.hyperears.integration.HeadsetArtwork
 import dev.hyperears.integration.HeadsetFormFactor
+import dev.hyperears.settings.HeadsetConnectionPresentation
 
 /** Physical connection provenance is separate from a replaceable protocol session. */
 data class HeadsetConnection(
@@ -33,6 +34,15 @@ data class NativeHeadsetProjection(
 ) {
     val hasBattery: Boolean get() = left.available || right.available || chargingCase.available
 
+    val showCaseInPopup: Boolean
+        get() = form == HeadsetFormFactor.TWS && !singleBattery && chargingCase.available
+
+    // The native connected island needs ear/headphone telemetry. Its single-battery template
+    // becomes an invalid icon-only model before a reading exists; a case reading cannot fill it.
+    val canShowConnectionHint: Boolean
+        get() = (left.available || right.available) &&
+            !(singleBattery && form == HeadsetFormFactor.TWS)
+
     companion object {
         fun from(state: EarbudState): NativeHeadsetProjection? {
             val adapter = state.adapter ?: return null
@@ -56,11 +66,28 @@ data class NativeHeadsetProjection(
     }
 }
 
-/** No timers or IO: the host calls this only for accepted events and capability changes. */
+internal enum class NativePresentationTarget { POPUP, ISLAND }
+
+/** Unknown native scene information cannot authorize an automatic popup. */
+internal fun resolveNativePresentationTarget(
+    selection: HeadsetConnectionPresentation,
+    onHomeOrCoverScreen: Boolean?,
+): NativePresentationTarget? = when (selection) {
+    HeadsetConnectionPresentation.SMART -> when (onHomeOrCoverScreen) {
+        true -> NativePresentationTarget.POPUP
+        false -> NativePresentationTarget.ISLAND
+        null -> null
+    }
+    HeadsetConnectionPresentation.BATTERY_POPUP -> NativePresentationTarget.POPUP
+    HeadsetConnectionPresentation.SYSTEM_HINT -> NativePresentationTarget.ISLAND
+    HeadsetConnectionPresentation.OFF -> null
+}
+
+/** No timers or IO; failed eligibility/display checks do not consume a connection. */
 internal class ConnectionPresentationGate(private val freshnessMs: Long = 10_000) {
     private val consumed = mutableMapOf<String, Long>()
 
-    fun consume(metadata: NativePresentationMetadata, now: Long): Boolean {
+    fun tryPresent(metadata: NativePresentationMetadata, now: Long, submit: () -> Boolean): Boolean {
         consumed.entries.removeAll { now - it.value > freshnessMs }
         if (metadata.replay) {
             consumed[metadata.connection.id] = metadata.connection.connectedAtElapsedMs
@@ -68,7 +95,9 @@ internal class ConnectionPresentationGate(private val freshnessMs: Long = 10_000
         }
         if (metadata.admission != NativeAdmission.HYPEREARS) return false
         if (now - metadata.connection.connectedAtElapsedMs !in 0..freshnessMs) return false
-        return consumed.putIfAbsent(metadata.connection.id, metadata.connection.connectedAtElapsedMs) == null
+        if (metadata.connection.id in consumed || !submit()) return false
+        consumed[metadata.connection.id] = metadata.connection.connectedAtElapsedMs
+        return true
     }
 
     fun retire(id: String) { consumed.remove(id) }

@@ -30,7 +30,10 @@ internal class NativeConnectionHint : HookContext() {
 
     fun show(projection: NativeHeadsetProjection, device: BluetoothDevice): Boolean {
         // A TWS aggregate stays one real number; the headwear animation would misrepresent its shape.
-        if (projection.singleBattery && projection.form == dev.hyperears.integration.HeadsetFormFactor.TWS) return false
+        if (projection.singleBattery && projection.form == dev.hyperears.integration.HeadsetFormFactor.TWS) {
+            ModuleLog.debug("NativeHint", "not submitted: TWS component battery unavailable")
+            return false
+        }
         val native = NativeMembers.field(notificationType, "mMiuiBluetoothNotification").get(null) ?: return false
         val previous = current.get()
         current.set(projection)

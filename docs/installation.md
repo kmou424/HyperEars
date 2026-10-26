@@ -15,9 +15,10 @@ com.android.bluetooth
 com.milink.service
 ```
 
-原生提示测试分支另外声明可选作用域 `com.xiaomi.bluetooth`（系统蓝牙扩展）。
+从 3.0.0 起，模块另外声明可选作用域 `com.xiaomi.bluetooth`（系统蓝牙扩展）。
 启用“连接时显示”或“耳机电量通知”时需要勾选它，并重启对应宿主进程。
-这两个功能默认关闭，不要求扩大到 System UI 或系统设置。
+“连接时显示”默认使用“智能”，也可选“仅弹窗”“仅超级岛”或“关闭”；
+耳机电量通知默认关闭。无需勾选 System UI 或系统设置。
 
 可选作用域见[厂商控制 App 与 LSPosed 作用域](control-apps.md)。只选择设备上实际安装、
 且确实会用于控制当前耳机的 App；同一品牌存在多个候选包名时，选择实际使用的版本即可。
@@ -50,7 +51,8 @@ Get-Content .\HyperEars-vX.Y.Z.apk.sha256
 
 1. 安装 APK。
 2. 打开 LSPosed，启用 HyperEars。
-3. 确认核心作用域为 `com.android.bluetooth` 和 `com.milink.service`。需要控制 App 退避时，
+3. 确认核心作用域为 `com.android.bluetooth` 和 `com.milink.service`。使用连接展示或电量通知时，
+   勾选 `com.xiaomi.bluetooth`。需要控制 App 退避时，
    再按[控制 App 目录](control-apps.md#2-当前目录)勾选对应的已安装厂商控制 App。
 4. 重启整台设备。
 5. 连接耳机，打开 HyperEars 运行看板。
@@ -68,6 +70,9 @@ Get-Content .\HyperEars-vX.Y.Z.apk.sha256
 
 设置页提供以下策略：
 
+- **连接时显示**：默认智能，按系统场景在桌面／外屏桌面显示弹窗，在应用内显示超级岛；
+  也可选仅弹窗、仅超级岛或关闭。需要系统蓝牙扩展作用域，且受宿主显示条件限制。
+- **耳机电量通知**：默认关闭，与连接展示独立；通知可以清除，后续状态回报可重新发布。
 - **点击卡片“更多设置”**：通过下拉选项选择打开系统设置、厂商 App 或 HyperEars；
   默认为系统设置，厂商 App 不可用时也回退到真实蓝牙设备详情。
 - **运行时退避**：厂商控制 App 运行时自动让出耳机私有控制通道；控制 App
@@ -75,7 +80,7 @@ Get-Content .\HyperEars-vX.Y.Z.apk.sha256
   创建蓝牙连接。
 - **自动检查更新**：默认开启，只在打开 HyperEars 时访问 GitHub Releases，且每天最多一次。
 
-“调试”是独立的二级页面，包含“适配器”“详细日志”和“导出日志”。“调试 > 适配器”
+“调试”是独立的二级页面，包含“适配器”“详细日志”“导出日志”和原生提示预览。“调试 > 适配器”
 按品牌折叠组织全部具体型号、家族回退和标准回退 Adapter，可分别启用或停用；每个品牌的总开关
 可一次停用或恢复该组全部 Adapter。关闭具体型号后，设备继续尝试同品牌的家族 Adapter；关闭
 相应家族 Adapter 后继续尝试标准回退。重新启用

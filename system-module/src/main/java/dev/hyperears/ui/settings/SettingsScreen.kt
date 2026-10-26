@@ -234,7 +234,7 @@ private fun HeadsetPresentationPreference(
     Box(modifier = Modifier.fillMaxWidth()) {
         ListItem(
             headlineContent = { Text("连接时显示", fontWeight = FontWeight.Medium) },
-            supportingContent = { Text("需勾选 com.xiaomi.bluetooth 作用域。") },
+            supportingContent = { Text("智能：桌面弹窗，应用内超级岛。需勾选 com.xiaomi.bluetooth 作用域。") },
             trailingContent = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(selected.title)
@@ -450,7 +450,7 @@ fun DebugSettingsScreen(
                         )
                         PreferenceDivider()
                         ActionPreference(
-                            title = "预览系统连接提示", detail = "使用当前耳机状态，遵循系统显示条件。",
+                            title = "预览超级岛", detail = "显示当前耳机的连接提示。",
                             available = !settings.modulePaused, running = false,
                             onClick = { BroadcastIdentity.send(context, NativePresentationContract.preview("hint")) },
                         )
