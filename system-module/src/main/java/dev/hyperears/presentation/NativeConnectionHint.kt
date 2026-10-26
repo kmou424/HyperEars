@@ -29,9 +29,9 @@ internal class NativeConnectionHint : HookContext() {
     }
 
     fun show(projection: NativeHeadsetProjection, device: BluetoothDevice): Boolean {
-        // A TWS aggregate stays one real number; the headwear animation would misrepresent its shape.
-        if (projection.singleBattery && projection.form == dev.hyperears.integration.HeadsetFormFactor.TWS) {
-            ModuleLog.debug("NativeHint", "not submitted: TWS component battery unavailable")
+        if (!projection.canShowConnectionHint) {
+            ModuleLog.debug("NativeHint", "not submitted: usable ear battery unavailable " +
+                "form=${projection.form} single=${projection.singleBattery}")
             return false
         }
         val native = NativeMembers.field(notificationType, "mMiuiBluetoothNotification").get(null) ?: return false
@@ -41,7 +41,8 @@ internal class NativeConnectionHint : HookContext() {
             NativeMembers.method(notificationType, "showConnectToastForAirPods",
                 Int::class.javaPrimitiveType!!, BluetoothDevice::class.java, Int::class.javaPrimitiveType!!)
                 .invoke(native, 2, device, if (projection.singleBattery) 3 else 0)
-            ModuleLog.debug("NativeHint", "submitted address=${maskBluetoothAddress(projection.address)}")
+            ModuleLog.debug("NativeHint", "submitted address=${maskBluetoothAddress(projection.address)} " +
+                "left=${projection.left.percent} right=${projection.right.percent} single=${projection.singleBattery}")
             true
         } finally {
             if (previous == null) current.remove() else current.set(previous)

@@ -96,6 +96,12 @@ internal class NativePresentationRuntime(
         ModuleSettingsRuntime.observe { updated -> handler.post {
             val old = settings
             settings = updated
+            if (old != updated) {
+                ModuleLog.debug(TAG) {
+                    "settings applied mode=${updated.headsetConnectionPresentation} " +
+                        "detailNotification=${updated.headsetDetailNotification} paused=${updated.modulePaused}"
+                }
+            }
             if (updated.modulePaused || old.headsetConnectionPresentation != updated.headsetConnectionPresentation) {
                 windowBridge?.closeAll("settings changed")
             }

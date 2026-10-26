@@ -461,6 +461,12 @@ class MainActivity : ComponentActivity() {
                     if (previous.yieldToVendorControlApp != updated.yieldToVendorControlApp) {
                         add("yieldToVendorControlApp=${updated.yieldToVendorControlApp}")
                     }
+                    if (previous.headsetConnectionPresentation != updated.headsetConnectionPresentation) {
+                        add("headsetConnectionPresentation=${updated.headsetConnectionPresentation.name}")
+                    }
+                    if (previous.headsetDetailNotification != updated.headsetDetailNotification) {
+                        add("headsetDetailNotification=${updated.headsetDetailNotification}")
+                    }
                     if (previous.diagnosticLogging != updated.diagnosticLogging) {
                         add("diagnosticLogging=${updated.diagnosticLogging}")
                     }

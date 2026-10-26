@@ -1,6 +1,7 @@
 package dev.hyperears.hook
 
 import android.app.Application
+import dev.hyperears.BuildConfig
 import dev.hyperears.bridge.ModuleRuntimeGate
 import dev.hyperears.integration.ControlAppCatalog
 import dev.hyperears.settings.ModuleSettingsRuntime
@@ -22,7 +23,7 @@ class HookEntry : XposedModule() {
         }
         ModuleLog.debug(
             "Entry",
-            "package loaded package=${param.packageName} " +
+            "package loaded version=${BuildConfig.VERSION_NAME} package=${param.packageName} " +
                 "classLoader=${param.defaultClassLoader.javaClass.name}",
         )
 
