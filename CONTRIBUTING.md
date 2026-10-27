@@ -56,7 +56,8 @@ node tools/validate-docs.mjs
     [展示资源规范](docs/headset-artwork.md)，不得把 Android 资源加载放入协议层。
 
 新增或变更厂商控制 App 时，还必须同步更新 `ControlAppCatalog`、对应 Adapter 的
-`controlApps`、`META-INF/xposed/scope.list` 和
+`controlApps`、`META-INF/xposed/scope.list`、`strings.xml` 中的 `xposed_scope`、
+`AndroidManifest.xml` 的 `queries` 和
 [控制 App 目录](docs/control-apps.md)，并补充控制权优先顺序测试。控制 App 包名只能作为
 导航目标和控制权边界，不能作为耳机品牌或型号的识别证据。
 
