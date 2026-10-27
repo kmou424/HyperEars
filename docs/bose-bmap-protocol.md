@@ -106,6 +106,12 @@ START configs: 1F 06 05 00
 返回且 `wind=true` 的预设，不修改用户模式参数。不同代 ModeConfig 的字段偏移由
 具体 Adapter 内嵌的 `BoseWireConfig` 提供，Codec 不写死成一个型号布局。
 
+卡片按实际原生布局选择适配：旧版 `anc_card` / `HeadsetControlAncItemView`，以及新版
+`anc_select_card` / `HeadsetSelectCardView` / `HeadsetSelectItemView`。`0x4075` 的抗风噪
+替换“关闭”槽，QC35 系列替换“通透”槽；两态型号保留并禁用“关闭”。原生选项的尺寸、
+边距和图标样式复用当前布局，解绑后恢复原控件。布局与模式映射有回归测试，新版 Bose
+卡片的实际渲染与点击仍待实机复核。
+
 ## 5. 电量 `[2.2]`
 
 ```text

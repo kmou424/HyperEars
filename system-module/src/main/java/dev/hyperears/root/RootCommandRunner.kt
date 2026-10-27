@@ -1,5 +1,7 @@
 package dev.hyperears.root
 
+import dev.hyperears.bridge.ModuleContract
+import dev.hyperears.integration.ControlAppCatalog
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -21,32 +23,52 @@ enum class RootAction(
     ),
     RESTART_BLUETOOTH(
         title = "重启蓝牙",
-        detail = "重新启动蓝牙，已连接设备会暂时断开。",
-        command = "svc bluetooth disable; sleep 1; svc bluetooth enable",
+        detail = "重启蓝牙及系统耳机服务，已连接设备会暂时断开。",
+        command = BluetoothRootCommands.restart,
         verificationCommand = "settings get global bluetooth_on",
         verificationSuccess = { it.trim() == "1" },
     ),
     STOP_VENDOR_APPS(
         title = "停止厂商应用",
         detail = "停止受支持的厂商应用，并恢复 HyperEars 控制。",
-        command = "for p in " +
-            "com.vivo.vivotws com.heytap.headset com.oplus.melody " +
-            "com.coloros.oppopods com.bose.bosemusic com.bose.monet " +
-            "com.edifier.edifierconnect cn.ikaile.ruoshui.client " +
-            "cn.lightyeartech.android com.yuandao.nicehck com.sony.songpal.mdr " +
-            "com.qcymall.googleearphonesetup com.panasonic.technicsaudioconnect " +
-            "com.huawei.smartaudio; " +
-            "do am force-stop \"\$p\" >/dev/null 2>&1 || true; done",
-        verificationCommand = "for p in " +
-            "com.vivo.vivotws com.heytap.headset com.oplus.melody " +
-            "com.coloros.oppopods com.bose.bosemusic com.bose.monet " +
-            "com.edifier.edifierconnect cn.ikaile.ruoshui.client " +
-            "cn.lightyeartech.android com.yuandao.nicehck com.sony.songpal.mdr " +
-            "com.qcymall.googleearphonesetup com.panasonic.technicsaudioconnect " +
-            "com.huawei.smartaudio; " +
-            "do pidof \"\$p\" && exit 1; done; exit 0",
+        command = VendorAppRootCommands.stop,
+        verificationCommand = VendorAppRootCommands.verifyStopped,
         verificationSuccess = { it.isBlank() },
     ),
+}
+
+/** Reloads both Bluetooth hosts; switching the radio alone can leave an old module process alive. */
+internal object BluetoothRootCommands {
+    private val hosts = listOf(ModuleContract.BLUETOOTH_PACKAGE, ModuleContract.NATIVE_HEADSET_PACKAGE)
+    private val processNames = (hosts + "${ModuleContract.NATIVE_HEADSET_PACKAGE}:ui")
+        .joinToString(" ") { "'$it'" }
+
+    val restart: String = buildList {
+        add("restart_status=0")
+        add("previous_pids=\$(pidof $processNames 2>/dev/null || true)")
+        add("svc bluetooth disable || restart_status=1")
+        add("sleep 1")
+        for (host in hosts) {
+            add("if pm path '$host' >/dev/null 2>&1; then am force-stop '$host' || restart_status=1; fi")
+        }
+        // Always request restoration, including when stopping an optional host failed.
+        add("svc bluetooth enable || restart_status=1")
+        add("current_pids=\$(pidof $processNames 2>/dev/null || true)")
+        add("for old_pid in \$previous_pids; do case \" \$current_pids \" in " +
+            "*\" \$old_pid \"*) echo \"Bluetooth host still running: \$old_pid\"; restart_status=1 ;; esac; done")
+        add("echo \"Bluetooth host processes: \$previous_pids -> \$current_pids\"")
+        add("exit \$restart_status")
+    }.joinToString("; ")
+}
+
+/** Uses the same trusted package catalog as adapter control ownership and LSPosed scope. */
+internal object VendorAppRootCommands {
+    private val packages = ControlAppCatalog.packageNames.sorted().joinToString(" ") { packageName ->
+        require(packageName.matches(Regex("[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)+")))
+        "'$packageName'"
+    }
+    val stop = "for p in $packages; do am force-stop \"\$p\" >/dev/null 2>&1 || true; done"
+    val verifyStopped = "for p in $packages; do pidof \"\$p\" && exit 1; done; exit 0"
 }
 
 sealed interface RootActionState {

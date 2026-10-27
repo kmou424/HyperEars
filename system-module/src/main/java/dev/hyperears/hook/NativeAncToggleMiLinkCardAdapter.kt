@@ -31,6 +31,19 @@ internal interface MiLinkToggleSpec {
     fun request(state: EarbudState, checked: Boolean): ControlRequest?
 }
 
+internal interface MiLinkToggleDetailsSpec : MiLinkToggleSpec {
+    fun openDetails(
+        anchor: View,
+        address: String,
+        environment: MiLinkCardEnvironment,
+    ): MiLinkToggleDetails
+}
+
+internal interface MiLinkToggleDetails {
+    fun render(state: EarbudState)
+    fun dismiss()
+}
+
 /** Native ANC layout and restoration shared by model-owned, protocol-confirmed toggle options. */
 internal open class NativeAncToggleMiLinkCardAdapter(
     final override val presentationId: MiLinkCardPresentationId,
@@ -280,14 +293,18 @@ internal open class NativeAncToggleMiLinkCardAdapter(
                 if (index > 0) setPadding(context.dp(LABEL_END_PADDING_DP), 0, 0, 0)
             }
             val label = TextView(accessory.context).apply {
-                text = spec.label
+                text = if (spec is MiLinkToggleDetailsSpec) "${spec.label} ›" else spec.label
                 setTextColor(style.textColors)
                 setTextSize(TypedValue.COMPLEX_UNIT_PX, style.textSize)
                 typeface = style.typeface
                 gravity = Gravity.CENTER_VERTICAL
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
-                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                importantForAccessibility = if (spec is MiLinkToggleDetailsSpec) {
+                    View.IMPORTANT_FOR_ACCESSIBILITY_YES
+                } else {
+                    View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                }
                 setPadding(0, 0, context.dp(LABEL_END_PADDING_DP), 0)
             }
             val toggle = createHostToggle(accessory.context, environment.hostClassLoader).apply {
@@ -305,7 +322,7 @@ internal open class NativeAncToggleMiLinkCardAdapter(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 if (fillWidth) 1f else 0f,
             ))
-            ToggleEntry(spec, WeakReference(group), WeakReference(toggle))
+            ToggleEntry(spec, WeakReference(group), WeakReference(label), WeakReference(toggle))
         }
         return ToggleController(entries, address, environment)
     }
@@ -313,7 +330,9 @@ internal open class NativeAncToggleMiLinkCardAdapter(
     private data class ToggleEntry(
         val spec: MiLinkToggleSpec,
         val group: WeakReference<View>,
+        val label: WeakReference<View>,
         val toggle: WeakReference<CompoundButton>,
+        var details: MiLinkToggleDetails? = null,
     )
 
     private class ToggleController(
@@ -328,6 +347,14 @@ internal open class NativeAncToggleMiLinkCardAdapter(
                 entry.toggle.get()?.setOnCheckedChangeListener { button, checked ->
                     onToggleChanged(entry.spec, button, checked)
                 }
+                (entry.spec as? MiLinkToggleDetailsSpec)?.let { detailsSpec ->
+                    entry.label.get()?.setOnClickListener { anchor ->
+                        entry.details?.dismiss()
+                        entry.details = detailsSpec.openDetails(anchor, address, environment).also {
+                            it.render(environment.stateProvider(address))
+                        }
+                    }
+                }
             }
         }
 
@@ -335,6 +362,7 @@ internal open class NativeAncToggleMiLinkCardAdapter(
             rendering = true
             try {
                 entries.forEach { entry ->
+                    entry.details?.render(state)
                     val toggle = entry.toggle.get() ?: return@forEach
                     val value = entry.spec.render(state)
                     entry.group.get()?.visibility = if (value.available) View.VISIBLE else View.GONE
@@ -348,7 +376,12 @@ internal open class NativeAncToggleMiLinkCardAdapter(
         }
 
         fun unbind() {
-            entries.forEach { it.toggle.get()?.setOnCheckedChangeListener(null) }
+            entries.forEach { entry ->
+                entry.toggle.get()?.setOnCheckedChangeListener(null)
+                entry.label.get()?.setOnClickListener(null)
+                entry.details?.dismiss()
+                entry.details = null
+            }
         }
 
         private fun onToggleChanged(spec: MiLinkToggleSpec, button: CompoundButton, checked: Boolean) {
@@ -405,20 +438,12 @@ internal open class NativeAncToggleMiLinkCardAdapter(
     }
 
     private fun resolveSelectAncCard(root: View): TitleAncCard? {
-        val selectTitle = root.findMiLinkView(SELECT_ANC_CARD_TITLE_ID) as? TextView ?: return null
-        val selectCard = root.findMiLinkView(SELECT_ANC_CARD_ID) as? LinearLayout ?: return null
-        if (selectCard.javaClass.name != SELECT_ANC_CARD_CLASS) return null
-        if (selectCard.childCount != NATIVE_MODE_COUNT) return null
-        if ((0 until selectCard.childCount).any { index ->
-                selectCard.getChildAt(index).javaClass.name != SELECT_ANC_ITEM_CLASS
-            }
-        ) {
-            return null
-        }
+        val row = NativeAncModeRow.resolve(root, NativeAncModeLayout.SELECT_CARD) ?: return null
+        val selectTitle = root.findMiLinkView(row.layout.titleId) as? TextView ?: return null
         return TitleAncCard(
             generation = NativeAncCardGeneration.SELECT_CARD,
             title = selectTitle,
-            container = selectCard,
+            container = row.container,
         )
     }
 
@@ -469,13 +494,6 @@ internal open class NativeAncToggleMiLinkCardAdapter(
         const val ORIGINAL_ANC_ITEM_TITLE_ID = "anc_title"
         const val ORIGINAL_ANC_ITEM_CLASS =
             "com.miui.circulate.world.headset.ui.HeadsetControlAncItemView"
-        const val SELECT_ANC_CARD_TITLE_ID = "anc_card_text"
-        const val SELECT_ANC_CARD_ID = "anc_select_card"
-        const val SELECT_ANC_CARD_CLASS =
-            "com.miui.circulate.world.headset.ui.HeadsetSelectCardView"
-        const val SELECT_ANC_ITEM_CLASS =
-            "com.miui.circulate.world.headset.ui.HeadsetSelectItemView"
-        const val NATIVE_MODE_COUNT = 3
         const val MIUIX_SLIDING_BUTTON = "miuix.slidingwidget.widget.SlidingButton"
         const val LABEL_END_PADDING_DP = 8
         const val EMBEDDED_HEADER_HEIGHT_DP = 48

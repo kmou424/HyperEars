@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-26",
+  "tool": "built-in image_gen",
+  "transparent_background": true,
+  "reference_images": [],
+  "assets": [
+    {
+      "file": "../system-module/src/main/res/drawable-nodpi/headset_generic_earbuds.png",
+      "prompt": "Use case: product-mockup. Asset type: production native Android headset battery dialog illustration, used small and large on both light and dark backgrounds. Primary request: Exactly two generic true wireless earbuds, compact rounded bodies with very short stems and small silicone tips, gently angled toward one another, balanced centered pair; no charging case. Style: refined minimal 3D industrial product illustration, restrained realistic matte pearl-grey polymer, subtle soft silver highlights, neutral dark grey interior details, clean crisp edges, no exaggerated gloss. Transparent background with genuine alpha, no ground plane, no backdrop, no text, no logo, no trademark, no watermark, no decorative elements. Square canvas, entire object visible, centered, occupy about 70 percent of the canvas, generous even transparent margins. Soft studio lighting from top left, dark enough silhouette to be legible on white and light enough on charcoal. This is an original generic headphone resource for HyperEars; do not copy any specific commercial product."
+    },
+    {
+      "file": "../system-module/src/main/res/drawable-nodpi/headset_generic_headphones.png",
+      "prompt": "Use case: product-mockup. Asset type: production native Android headset battery dialog illustration, used small and large on both light and dark backgrounds. Primary request: Exactly one generic over-ear headphone, a continuous gently curved headband with two oval earcups, three-quarter front view, recognizable symmetrical silhouette; no earbuds or case. Style: refined minimal 3D industrial product illustration, restrained realistic matte pearl-grey polymer, subtle soft silver highlights, neutral dark grey interior details, clean crisp edges, no exaggerated gloss. Transparent background with genuine alpha, no ground plane, no backdrop, no text, no logo, no trademark, no watermark, no decorative elements. Square canvas, entire object visible, centered, occupy about 70 percent of the canvas, generous even transparent margins. Soft studio lighting from top left, dark enough silhouette to be legible on white and light enough on charcoal. This is an original generic headphone resource for HyperEars; do not copy any specific commercial product."
+    },
+    {
+      "file": "../system-module/src/main/res/drawable-nodpi/headset_generic_case.png",
+      "prompt": "Use case: product-mockup. Asset type: production native Android headset battery dialog illustration, used small and large on both light and dark backgrounds. Primary request: Exactly one generic true wireless earbud charging case, closed lid, a low rounded horizontal pill-shaped body with a fine lid seam, front three-quarter view, no earbuds visible, no branding. Style: refined minimal 3D industrial product illustration, restrained realistic matte pearl-grey polymer, subtle soft silver highlights, neutral dark grey interior details, clean crisp edges, no exaggerated gloss. Transparent background with genuine alpha, no ground plane, no backdrop, no text, no logo, no trademark, no watermark, no decorative elements. Square canvas, entire object visible, centered, occupy about 70 percent of the canvas, generous even transparent margins. Soft studio lighting from top left, dark enough silhouette to be legible on white and light enough on charcoal. This is an original generic headphone resource for HyperEars; do not copy any specific commercial product."
+    }
+  ]
+}

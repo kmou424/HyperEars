@@ -115,6 +115,8 @@ class MainActivity : ComponentActivity() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 ModuleContract.ACTION_STATE_CHANGED -> {
+                    if (context == null || !dev.hyperears.bridge.BroadcastIdentity.accepts(
+                            context, sentFromPackage, sentFromUid, ModuleContract.BLUETOOTH_PACKAGE)) return
                     with(ModuleContract) {
                         val state = intent.readState()
                         val token = intent.readSessionToken()
@@ -458,6 +460,12 @@ class MainActivity : ComponentActivity() {
                     }
                     if (previous.yieldToVendorControlApp != updated.yieldToVendorControlApp) {
                         add("yieldToVendorControlApp=${updated.yieldToVendorControlApp}")
+                    }
+                    if (previous.headsetConnectionPresentation != updated.headsetConnectionPresentation) {
+                        add("headsetConnectionPresentation=${updated.headsetConnectionPresentation.name}")
+                    }
+                    if (previous.headsetDetailNotification != updated.headsetDetailNotification) {
+                        add("headsetDetailNotification=${updated.headsetDetailNotification}")
                     }
                     if (previous.diagnosticLogging != updated.diagnosticLogging) {
                         add("diagnosticLogging=${updated.diagnosticLogging}")

@@ -1,5 +1,6 @@
 com.android.bluetooth
 com.milink.service
+com.xiaomi.bluetooth
 com.vivo.vivotws
 com.heytap.headset
 com.oplus.melody
@@ -15,3 +16,14 @@ com.qcymall.googleearphonesetup
 com.panasonic.technicsaudioconnect
 com.huawei.smartaudio
 com.moondroplab.moondrop.moondrop_app
+com.samsung.android.app.watchmanager
+com.samsung.accessory.zenithmgr
+com.samsung.accessory.berrymgr
+com.samsung.accessory.pearlmgr
+com.samsung.accessory.atticmgr
+com.samsung.accessory.neobeanmgr
+com.samsung.accessory.jellymgr
+com.samsung.accessory.paranmgr
+com.samsung.accessory.pianomgr
+com.samsung.accessory.gemstonemgr
+com.samsung.accessory.budsunitemgr

@@ -1,9 +1,7 @@
 package dev.hyperears.hook
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.view.View
-import android.widget.LinearLayout
 import dev.hyperears.integration.ControlRequest
 import dev.hyperears.integration.EarbudState
 import dev.hyperears.integration.MiLinkCardPresentationId
@@ -59,6 +57,8 @@ internal data class MiLinkCardEnvironment(
     val hostClassLoader: ClassLoader,
     val stateProvider: (String) -> EarbudState,
     val controlSender: (String, ControlRequest) -> Unit,
+    /** Observe accepted state while a details window is open; returned callback unsubscribes. */
+    val observeState: (String, (EarbudState) -> Unit) -> (() -> Unit),
 )
 
 /**
@@ -81,6 +81,7 @@ internal object MiLinkCardAdapterRegistry {
         EdifierFitBudsTurboMiLinkCardAdapter,
         FitClipUltraGameModeMiLinkCardAdapter,
         SonyAmbientOnlyMiLinkCardAdapter,
+        SamsungBuds2ProMiLinkCardAdapter,
     )
     private val byId = adapters.associateBy(MiLinkCardAdapter::presentationId)
 
@@ -101,35 +102,7 @@ internal fun View.findMiLinkView(name: String): View? {
     return id.takeIf { it != 0 }?.let(::findViewById)
 }
 
-/**
- * Creates one item using MiLink's native ANC-item class and the row's existing layout contract.
- *
- * Concrete card adapters own the item's semantics; this helper only centralizes stable host-view
- * construction so model adapters never draw an imitation of MiLink's controls.
- */
-internal fun createNativeMiLinkAncItem(
-    context: Context,
-    hostClassLoader: ClassLoader,
-    layoutTemplate: View,
-): View? = runCatching {
-    val item = Class.forName(HOST_ANC_ITEM_CLASS, true, hostClassLoader)
-        .asSubclass(View::class.java)
-        .getConstructor(Context::class.java)
-        .newInstance(context)
-    item.layoutParams = when (val source = layoutTemplate.layoutParams) {
-        is LinearLayout.LayoutParams -> LinearLayout.LayoutParams(source)
-        else -> LinearLayout.LayoutParams(
-            0,
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            1f,
-        )
-    }
-    item
-}.onFailure {
-    ModuleLog.warn("MiLinkUi", "native ANC item unavailable", it)
-}.getOrNull()
-
-/** Stable, non-obfuscated native item boundary shared by construction and selection guarding. */
+/** Stable, non-obfuscated original MiLink item boundary. */
 internal const val HOST_ANC_ITEM_CLASS =
     "com.miui.circulate.world.headset.ui.HeadsetControlAncItemView"
 private const val MILINK_PACKAGE = "com.milink.service"

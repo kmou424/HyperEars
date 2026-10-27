@@ -9,11 +9,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
-import android.provider.Settings
 import android.view.View
 import dev.hyperears.bridge.BridgeStage
+import dev.hyperears.bridge.HeadsetSettingsNavigator
 import dev.hyperears.bridge.ModuleContract
 import dev.hyperears.bridge.ModuleRuntimeGate
+import dev.hyperears.bridge.BroadcastIdentity
+import dev.hyperears.bridge.NativePresentationContract
 import dev.hyperears.bridge.ProcessStateStore
 import dev.hyperears.integration.ControlRequest
 import dev.hyperears.integration.StandardControlRequest
@@ -26,7 +28,6 @@ import dev.hyperears.integration.NoiseModeFeatureState
 import dev.hyperears.integration.withFeature
 import dev.hyperears.settings.ModuleSettings
 import dev.hyperears.settings.ModuleSettingsRuntime
-import dev.hyperears.settings.MoreSettingsTarget
 import java.io.Closeable
 import java.lang.reflect.Method
 import java.util.Collections
@@ -84,6 +85,9 @@ internal class MiLinkServiceHook : HookContext() {
             val wasPaused = settings.modulePaused
             settings = updated
             if (updated.modulePaused && !wasPaused) clearModuleState()
+            if (!updated.modulePaused) {
+                ProcessStateStore.snapshots().forEach(::queryNativeAdmission)
+            }
         }
         hookApplicationContext()
         val runtimeClasses = listOf(
@@ -259,80 +263,10 @@ internal class MiLinkServiceHook : HookContext() {
     }
 
     private fun openPreferredHeadsetSettings(address: String): Boolean {
-        val state = stateForAddress(address)
-        return when (settings.moreSettingsTarget) {
-            MoreSettingsTarget.SYSTEM_SETTINGS -> openBluetoothDeviceSettings(address)
-            MoreSettingsTarget.VENDOR_APP ->
-                openControlApp(state) || openBluetoothDeviceSettings(address)
-            MoreSettingsTarget.HYPEREARS ->
-                openHyperEars() || openBluetoothDeviceSettings(address)
-        }
-    }
-
-    private fun openHyperEars(): Boolean {
         val appContext = context ?: return false
-        val intent = Intent(Intent.ACTION_MAIN)
-            .setClassName(ModuleContract.MODULE_PACKAGE, HYPEREARS_MAIN_ACTIVITY)
-            .addCategory(Intent.CATEGORY_LAUNCHER)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        return runCatching { appContext.startActivity(intent) }
-            .onFailure { ModuleLog.warn("MiLink", "unable to open HyperEars", it) }
-            .isSuccess
-    }
-
-    private fun openControlApp(state: EarbudState): Boolean {
-        val appContext = context ?: return false
-        val adapter = state.adapter ?: return false
-        val candidates = buildList {
-            state.lifecycle.externalControlApp?.let(::add)
-            adapter.controlApps.forEach { candidate ->
-                if (none { it.packageName == candidate.packageName }) add(candidate)
-            }
-        }
-        val launch = candidates.firstNotNullOfOrNull { controlApp ->
-            appContext.packageManager
-                .getLaunchIntentForPackage(controlApp.packageName)
-                ?.let { controlApp to it }
-        } ?: return false
-        val (controlApp, intent) = launch
-        return runCatching {
-            appContext.startActivity(
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
-            )
-        }.onSuccess {
-            ModuleLog.debug(
-                "MiLink",
-                "opened ${controlApp.packageName} for ${maskBluetoothAddress(state.address)}",
-            )
-        }.onFailure {
-            ModuleLog.warn(
-                "MiLink",
-                "unable to open ${controlApp.displayName}",
-                it,
-            )
-        }.isSuccess
-    }
-
-    private fun openBluetoothDeviceSettings(address: String): Boolean {
-        val appContext = context ?: return false
-        val fragmentArguments = Bundle().apply {
-            putString(EXTRA_DEVICE_ADDRESS, address)
-        }
-        val deviceDetails = Intent(ACTION_BLUETOOTH_DEVICE_DETAIL_SETTINGS)
-            .setPackage(SETTINGS_PACKAGE)
-            .putExtra(EXTRA_DEVICE_ADDRESS, address)
-            .putExtra(EXTRA_SHOW_FRAGMENT_ARGUMENTS, fragmentArguments)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        if (runCatching { appContext.startActivity(deviceDetails) }.isSuccess) return true
-
-        val bluetoothSettings = Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
-            .setPackage(SETTINGS_PACKAGE)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        return runCatching { appContext.startActivity(bluetoothSettings) }
-            .onFailure {
-                ModuleLog.warn("MiLink", "unable to open Bluetooth settings", it)
-            }
-            .isSuccess
+        val current = ModuleSettingsRuntime.current
+        if (current.modulePaused) return false
+        return HeadsetSettingsNavigator(appContext).open(address, stateForAddress(address), current.moreSettingsTarget)
     }
 
     /**
@@ -570,6 +504,11 @@ internal class MiLinkServiceHook : HookContext() {
                 captureContext(instance)
 
                 val candidateState = rawStateForAddress(address)
+                val nativeResult = result
+                if (MiLinkDeviceOwnershipRegistry.isNativeAdmissionAccepted(nativeResult) ||
+                    MiLinkDeviceOwnershipRegistry.isNativeAdmissionRejected(nativeResult)) {
+                    ProcessStateStore.sessionToken(address)?.let { admissionQueries[address] = it }
+                }
                 val decision = deviceOwnership.observeNativeAdmission(
                     address = address,
                     originalResult = result,
@@ -602,6 +541,9 @@ internal class MiLinkServiceHook : HookContext() {
                         recordBridgeStage(device, BridgeStage.IDENTITY_QUERIED)
                         rememberRuntimeOwner(className, instance)
                         result = NATIVE_HEADSET_SUPPORTED
+                        if (MiLinkDeviceOwnershipRegistry.isNativeAdmissionRejected(nativeResult)) {
+                            publishNativeAdmission(address)
+                        }
                     }
 
                     MiLinkDeviceOwnershipRegistry.Owner.UNKNOWN -> Unit
@@ -746,8 +688,12 @@ internal class MiLinkServiceHook : HookContext() {
             object : BroadcastReceiver() {
                 override fun onReceive(context: Context?, intent: Intent?) {
                     when (intent?.action) {
-                        ModuleContract.ACTION_STATE_CHANGED ->
-                            handleStateChanged(intent)
+                        ModuleContract.ACTION_STATE_CHANGED -> {
+                            if (context != null && BroadcastIdentity.accepts(context,
+                                    sentFromPackage, sentFromUid, ModuleContract.BLUETOOTH_PACKAGE)) {
+                                handleStateChanged(intent)
+                            }
+                        }
 
                         ModuleContract.ACTION_REQUEST_BRIDGE_STATUS -> {
                             val targetPackage = with(ModuleContract) {
@@ -780,6 +726,7 @@ internal class MiLinkServiceHook : HookContext() {
     }
 
     private fun clearModuleState() {
+        admissionQueries.clear()
         knownAddresses.clear()
         deviceOwnership.clear()
         pendingSystemOwnershipClaims.clear()
@@ -799,12 +746,14 @@ internal class MiLinkServiceHook : HookContext() {
             ?.let(ProcessStateStore::knownSnapshot)
             ?: EarbudState()
         val state = ProcessStateStore.accept(intent) ?: return
+        ModuleLog.debug("MiLink", "accepted state rev=${state.revision}")
         state.address?.let {
             val normalized = normalizeAddress(it)
             val systemOwned = deviceOwnership.isSystemOwned(it)
             if (state.sessionActive && !systemOwned) {
                 knownAddresses += normalized
                 observeStateAccepted(state, sessionToken)
+                queryNativeAdmission(state)
             } else {
                 if (systemOwned) {
                     knownAddresses.remove(normalized)
@@ -822,6 +771,40 @@ internal class MiLinkServiceHook : HookContext() {
             headsetDetailExtension?.onStateChanged(state)
         }
     }
+
+    private fun publishNativeAdmission(address: String) {
+        val appContext = context ?: return
+        val token = ProcessStateStore.sessionToken(address) ?: return
+        BroadcastIdentity.send(appContext, NativePresentationContract.admission(address, token))
+    }
+
+    /** Query the existing bound service once per candidate; no new service or retry timer. */
+    @SuppressLint("MissingPermission")
+    private fun queryNativeAdmission(state: EarbudState) {
+        if (settings.headsetConnectionPresentation ==
+            dev.hyperears.settings.HeadsetConnectionPresentation.OFF &&
+            !settings.headsetDetailNotification) return
+        val address = state.address ?: return
+        if (deviceOwnership.isSystemOwned(address)) return
+        val token = ProcessStateStore.sessionToken(address) ?: return
+        if (admissionQueries[address] == token) return
+        val appContext = context ?: return
+        runCatching {
+            val type = findClass("com.xiaomi.mxbluetoothsdk.service.MxBluetoothService")
+            val owner = type.getDeclaredField("mMxBluetoothService")
+                .apply { isAccessible = true }.get(null) ?: return
+            if (type.getDeclaredField("mBluetoothHeadsetService")
+                    .apply { isAccessible = true }.get(owner) == null) return
+            val device = appContext.getSystemService(BluetoothManager::class.java)
+                ?.adapter?.getRemoteDevice(address) ?: return
+            // Our existing after Hook observes the original result. The final result is ignored.
+            type.getDeclaredMethod("checkIsMiTWS", BluetoothDevice::class.java).invoke(owner, device)
+        }.onFailure {
+            ModuleLog.debug("MiLink", "native admission query unavailable: ${it.javaClass.simpleName}")
+        }
+    }
+
+    private val admissionQueries = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     private fun handleSystemOwnershipClaim(
         context: Context?,
@@ -1342,12 +1325,6 @@ internal class MiLinkServiceHook : HookContext() {
     }
 
     private companion object {
-        const val ACTION_BLUETOOTH_DEVICE_DETAIL_SETTINGS =
-            "com.android.settings.BLUETOOTH_DEVICE_DETAIL_SETTINGS"
-        const val EXTRA_DEVICE_ADDRESS = "device_address"
-        const val EXTRA_SHOW_FRAGMENT_ARGUMENTS = ":settings:show_fragment_args"
-        const val SETTINGS_PACKAGE = "com.android.settings"
-        const val HYPEREARS_MAIN_ACTIVITY = "dev.hyperears.MainActivity"
         const val MILINK_RAW_ANC_NO_TRANSPARENCY = 3
         const val MILINK_RAW_ANC_ALL_MODES = 7
         const val NO_ANC_CAPABILITY = 0

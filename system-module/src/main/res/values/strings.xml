@@ -4,6 +4,7 @@
     <string-array name="xposed_scope">
         <item>com.android.bluetooth</item>
         <item>com.milink.service</item>
+        <item>com.xiaomi.bluetooth</item>
         <item>com.vivo.vivotws</item>
         <item>com.heytap.headset</item>
         <item>com.oplus.melody</item>
@@ -18,5 +19,10 @@
         <item>com.qcymall.googleearphonesetup</item>
         <item>com.panasonic.technicsaudioconnect</item>
         <item>com.huawei.smartaudio</item>
+        <item>com.moondroplab.moondrop.moondrop_app</item>
+        <item>com.samsung.android.app.watchmanager</item>
+        <item>com.samsung.accessory.zenithmgr</item>
+        <item>com.samsung.accessory.berrymgr</item>
+        <item>com.samsung.accessory.pearlmgr</item>
     </string-array>
 </resources>

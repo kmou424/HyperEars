@@ -51,6 +51,9 @@ node tools/validate-docs.mjs
     `requestState(featureId, delayMs)`；达到接受条件时声明 `cancelStateRequest(featureId)`。
     Android 会话只机械执行有序 `AdapterEffect`，不得保存型号目标、重试次数或接受策略；
     WireCodec、ProtocolSession、MiLink Hook 和 UI 中不得按型号休眠或建立常驻轮询。
+13. 原生展示图片通过 Adapter 的 `artwork` 声明，具体型号继承或覆盖家族资源。
+    资源 ID、能力证据和系统设备身份互相独立。新增图片须遵循
+    [展示资源规范](docs/headset-artwork.md)，不得把 Android 资源加载放入协议层。
 
 新增或变更厂商控制 App 时，还必须同步更新 `ControlAppCatalog`、对应 Adapter 的
 `controlApps`、`META-INF/xposed/scope.list` 和
@@ -94,6 +97,16 @@ node tools/validate-docs.mjs
 维护记录：2026-09-07，#72 在共享卡片布局尚未得到实机复核时提前合入，并自动关闭 #62。
 2026-09-08 维护者决定保留这次合入，不回退代码和 PR 状态；该决定仅适用于本次事件，
 后续仍须执行上述复核流程。FitBuds Turbo 的维护版布局继续标记为待复核。
+
+2026-10-23，维护者明确授权本轮审查中无新增问题、长期未获反馈的维护版直接合入。
+本次例外仅适用于 MIRAGE #86（原 PR #75）、Samsung #87（原 PR #74 / #83）及名称修正 #88。
+原作者提交与原版实测记录保留；维护版缺少的实机复核继续如实标注，合入不代表补齐
+实测。ROSE #76 / #85 已收到退避恢复异常反馈，不在此次放行范围，继续保持开放。
+后续贡献仍按上述实机复核流程处理。
+
+2026-10-24，ROSE #76 作者补充确认 #85 维护版的退避恢复及其他功能连续三次测试正常；
+结合此前的连接、模式控制及重连反馈，维护版 `f11a831` 的实机复核已完成。本次同步主线
+只解决更新日志冲突并更新复核记录，不改变已复核的端点与协议行为。
 
 ### 提交要求
 

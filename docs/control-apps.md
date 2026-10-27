@@ -4,7 +4,7 @@
 
 HyperEars 将厂商控制 App 用于两个彼此独立的功能：
 
-1. MiLink 卡片的“更多设置”选择“厂商 App”时，可以打开当前 Adapter 声明的控制 App；
+1. “点击卡片‘更多设置’”选择“厂商 App”时，卡片、电量通知和连接弹窗可打开当前 Adapter 声明的控制 App；
 2. 启用“运行时退避”后，已 Hook 的控制 App 进程存活时，HyperEars 让出耳机私有控制通道。
 
 控制 App 的包名不是耳机型号或品牌的识别证据。耳机仍由 Android 蓝牙身份、设备名称、
@@ -29,11 +29,39 @@ Sony | Headphones Connect。
 | ROSESELSA / 弱水时砂 | ROSELINK | `cn.ikaile.ruoshui.client` | 1 |
 | StarRing / 籁特易耳 | LightYear | `cn.lightyeartech.android` | 1 |
 | NiceHCK / YuanDao | 原道 | `com.yuandao.nicehck` | 1 |
-| MOONDROP Pudding | MOONDROP | `com.moondroplab.moondrop.moondrop_app` | 1 |
+| MOONDROP 家族（Pudding / MIRAGE） | MOONDROP | `com.moondroplab.moondrop.moondrop_app` | 1 |
 | QCY | QCY | `com.qcymall.googleearphonesetup` | 1 |
 | Sony | Sony \| Sound Connect | `com.sony.songpal.mdr` | 1 |
 | Technics EAH-AZ TWS | Technics Audio Connect | `com.panasonic.technicsaudioconnect` | 1 |
 | 华为 FreeBuds 系列 | 智慧音频 | `com.huawei.smartaudio` | 1 |
+| Samsung Galaxy Buds2 Pro | Galaxy Wearable | `com.samsung.android.app.watchmanager` | 1 |
+| Samsung Galaxy Buds2 Pro | Galaxy Buds2 Pro Manager | `com.samsung.accessory.zenithmgr` | 2 |
+| Samsung Galaxy Buds2 | Galaxy Wearable | `com.samsung.android.app.watchmanager` | 1 |
+| Samsung Galaxy Buds2 | Galaxy Buds2 Manager | `com.samsung.accessory.berrymgr` | 2 |
+| Samsung Galaxy Buds FE | Galaxy Wearable | `com.samsung.android.app.watchmanager` | 1 |
+| Samsung Galaxy Buds FE | Galaxy Buds FE Manager | `com.samsung.accessory.pearlmgr` | 2 |
+| Samsung Galaxy Buds Live | Galaxy Wearable | `com.samsung.android.app.watchmanager` | 1 |
+| Samsung Galaxy Buds Live | Galaxy Buds Live Manager | `com.samsung.accessory.neobeanmgr` | 2 |
+| Samsung Galaxy Buds Pro | Galaxy Wearable | `com.samsung.android.app.watchmanager` | 1 |
+| Samsung Galaxy Buds Pro | Galaxy Buds Pro Manager | `com.samsung.accessory.atticmgr` | 2 |
+| Samsung Galaxy Buds3 | Galaxy Wearable | `com.samsung.android.app.watchmanager` | 1 |
+| Samsung Galaxy Buds3 | Galaxy Buds3 Manager | `com.samsung.accessory.jellymgr` | 2 |
+| Samsung Galaxy Buds3 Pro | Galaxy Wearable | `com.samsung.android.app.watchmanager` | 1 |
+| Samsung Galaxy Buds3 Pro | Galaxy Buds3 Pro Manager | `com.samsung.accessory.paranmgr` | 2 |
+| Samsung Galaxy Buds Core | Galaxy Wearable | `com.samsung.android.app.watchmanager` | 1 |
+| Samsung Galaxy Buds Core | Galaxy Buds Core Manager | `com.samsung.accessory.pianomgr` | 2 |
+| Samsung Galaxy Buds3 FE | Galaxy Wearable | `com.samsung.android.app.watchmanager` | 1 |
+| Samsung Galaxy Buds3 FE | Galaxy Buds3 FE Manager | `com.samsung.accessory.gemstonemgr` | 2 |
+| Samsung Galaxy Buds4 / Buds4 Pro | Galaxy Wearable | `com.samsung.android.app.watchmanager` | 1 |
+| Samsung Galaxy Buds4 / Buds4 Pro | Galaxy Buds | `com.samsung.accessory.budsunitemgr` | 2 |
+| 其余已配置的 Samsung Galaxy Buds 具体型号 | Galaxy Buds | `com.samsung.accessory.budsunitemgr` | 3 |
+| Samsung Galaxy Buds（共享服务回退） | Galaxy Wearable | `com.samsung.android.app.watchmanager` | 1 |
+
+三星新增控制器包名与显示名已于 2026-10-03 核对 Samsung 发布的
+[Google Play 列表](https://play.google.com/store/apps/dev?id=5200379633052405703)；
+统一 Galaxy Buds 控制器的包名以
+[官方应用页面](https://play.google.com/store/apps/details?id=com.samsung.accessory.budsunitemgr) 为准。
+以上只声明导航与进程控制权优先顺序；不表示各型号导航与退避已实机验证。
 
 “Adapter 声明顺序”只在同一家族声明了多个控制 App 时使用：
 
@@ -56,12 +84,16 @@ StarRing、ROSESELSA 等名称描述的是耳机 Adapter 的适用范围；控�
 - **厂商 App**：按以下顺序选择控制 App；没有可启动候选时回退到系统设置；
 - **HyperEars**：打开 HyperEars 主页；启动失败时回退到系统设置。
 
-选择“厂商 App”后，MiLink 的“更多设置”按以下顺序处理：
+MiLink 的“更多设置”、电量通知和连接弹窗内容区共用此选项，点击时读取当前设置。
+选择“厂商 App”后按以下顺序处理：
 
 1. 读取当前耳机会话的 Adapter 快照；
-2. 取得该 Adapter 声明的控制 App 列表；
+2. 取得该 Adapter 声明的控制 App 列表，当前持有控制权的 App 优先；
 3. 选择第一个已安装且可启动的 App；
 4. 没有可启动候选时，打开真实蓝牙设备详情；设备详情不可用时再回退到蓝牙设置列表。
+
+启动候选 App 失败时同样回退到系统设置。跳转成功后关闭对应连接弹窗；通知的原生“断开”
+和清除操作、弹窗关闭按钮继续由系统处理。系统原生接管的设备不使用这条模块导航路径。
 
 仅执行页面跳转时，技术条件是 App 已安装且具有 Launcher Activity；LSPosed 作用域不参与
 Android 的 `startActivity`。但是，未勾选作用域的 App 无法向 HyperEars 登记进程存活状态，
@@ -109,6 +141,10 @@ GATT、RFCOMM 或 L2CAP 连接作为退避条件。
 com.android.bluetooth
 com.milink.service
 ```
+
+从 3.0.0 起还声明 `com.xiaomi.bluetooth`，用于系统耳机窗口、连接提示和电量通知。
+它是可选的系统展示宿主，不是厂商控制 App，也不参与品牌判型。
+连接展示默认使用智能模式，耳机电量通知默认关闭；两者都依赖此作用域。
 
 厂商控制 App 是可选作用域。推荐配置顺序：
 

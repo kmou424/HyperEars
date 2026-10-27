@@ -53,6 +53,10 @@ import dev.hyperears.integration.EarbudAdapterKind
 import dev.hyperears.root.RootAction
 import dev.hyperears.root.RootActionState
 import dev.hyperears.settings.ModuleSettings
+import dev.hyperears.settings.HeadsetConnectionPresentation
+import dev.hyperears.bridge.BroadcastIdentity
+import dev.hyperears.bridge.NativePresentationContract
+import androidx.compose.ui.platform.LocalContext
 import dev.hyperears.settings.MoreSettingsTarget
 import dev.hyperears.ui.components.HyperEarsPage
 import dev.hyperears.ui.components.rememberSwitchHaptics
@@ -113,6 +117,23 @@ fun SettingsScreen(
                         onCheckedChange = {
                             onSettingsChanged(settings.copy(yieldToVendorControlApp = it))
                         },
+                    )
+                }
+            }
+            item(key = "native-presentation-header") {
+                PreferenceSectionTitle("系统提示")
+            }
+            item(key = "native-presentation-preferences") {
+                SettingsGroupCard {
+                    HeadsetPresentationPreference(settings.headsetConnectionPresentation) {
+                        onSettingsChanged(settings.copy(headsetConnectionPresentation = it))
+                    }
+                    PreferenceDivider()
+                    TogglePreference(
+                        title = "耳机电量通知",
+                        detail = "在通知栏显示已连接耳机的电量。需勾选 com.xiaomi.bluetooth 作用域。",
+                        checked = settings.headsetDetailNotification,
+                        onCheckedChange = { onSettingsChanged(settings.copy(headsetDetailNotification = it)) },
                     )
                 }
             }
@@ -201,6 +222,35 @@ fun SettingsScreen(
             }
         }
 
+    }
+}
+
+@Composable
+private fun HeadsetPresentationPreference(
+    selected: HeadsetConnectionPresentation,
+    onSelected: (HeadsetConnectionPresentation) -> Unit,
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    Box(modifier = Modifier.fillMaxWidth()) {
+        ListItem(
+            headlineContent = { Text("连接时显示", fontWeight = FontWeight.Medium) },
+            supportingContent = { Text("智能：桌面弹窗，应用内超级岛。需勾选 com.xiaomi.bluetooth 作用域。") },
+            trailingContent = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(selected.title)
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = "选择连接提示")
+                }
+            },
+            modifier = Modifier.clickable { expanded = true },
+        )
+        DropdownMenu(expanded, onDismissRequest = { expanded = false }) {
+            HeadsetConnectionPresentation.entries.forEach { choice ->
+                DropdownMenuItem(text = { Text(choice.title) }, onClick = {
+                    expanded = false
+                    onSelected(choice)
+                })
+            }
+        }
     }
 }
 
@@ -343,6 +393,7 @@ fun DebugSettingsScreen(
     onOpenAdapters: () -> Unit,
     onNavigateBack: () -> Unit,
 ) {
+    val context = LocalContext.current
     HyperEarsPage(title = "调试", onNavigateBack = onNavigateBack) { pagePadding, scrollBehavior ->
         val listState = rememberLazyListState()
         LazyColumn(
@@ -396,6 +447,18 @@ fun DebugSettingsScreen(
                             available = rootAvailable == true,
                             running = false,
                             onClick = onExportLogs,
+                        )
+                        PreferenceDivider()
+                        ActionPreference(
+                            title = "预览超级岛", detail = "显示当前耳机的连接提示。",
+                            available = !settings.modulePaused, running = false,
+                            onClick = { BroadcastIdentity.send(context, NativePresentationContract.preview("hint")) },
+                        )
+                        PreferenceDivider()
+                        ActionPreference(
+                            title = "预览电量弹窗", detail = "查看当前耳机的原生电量窗口。",
+                            available = !settings.modulePaused, running = false,
+                            onClick = { BroadcastIdentity.send(context, NativePresentationContract.preview("popup")) },
                         )
                     }
                 }

@@ -17,6 +17,17 @@ class ModuleSettingsTest {
     }
 
     @Test
+    fun connectionPresentationDefaultsToSmartAndPreservesExistingSelections() {
+        assertEquals(HeadsetConnectionPresentation.SMART, ModuleSettings().headsetConnectionPresentation)
+        assertFalse(ModuleSettings().headsetDetailNotification)
+        assertEquals(HeadsetConnectionPresentation.SMART, HeadsetConnectionPresentation.fromStoredValue(null))
+        assertEquals(HeadsetConnectionPresentation.SMART, HeadsetConnectionPresentation.fromStoredValue("unknown"))
+        for (stored in listOf("OFF", "SYSTEM_HINT", "BATTERY_POPUP", "SMART")) {
+            assertEquals(stored, HeadsetConnectionPresentation.fromStoredValue(stored).name)
+        }
+    }
+
+    @Test
     fun moreSettingsTargetRejectsUnknownStoredValues() {
         assertEquals(
             MoreSettingsTarget.VENDOR_APP,

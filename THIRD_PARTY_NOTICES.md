@@ -105,6 +105,19 @@ SPP 握手、电量查询与三态噪声控制协议事实。Robin 参考固定�
 相关文档在引用处保留来源链接；HyperEars 根据互操作协议事实独立实现 WireCodec 与
 ProtocolSession，不复制上游程序、厂商资源或应用代码。上游文档采用 CC BY-SA 4.0。
 
+## MOONDROP 产品目录快照与客户端协议蒸馏
+
+- MOONDROP 公开产品 API 快照：
+  <https://cdn-service.moondroplab.tech/api/v1/products/all>（只读 GET，抓取日期
+  2026-09-16）
+- MOONDROP Android 客户端二进制的 `classes.dex` 全量反汇编（baksmali 2.5.2），仅作
+  互操作研究，反编译产物不入库。
+
+用于协议文档中 MIRAGE / Pudding / Robin 的型号事实（UUID、
+`chipType`、EQ 段数、OTA 与形态标记），以及 MIRAGE 候选适配的平面推断与协议边界
+登记。本仓库只记录可互操作事实与 `文件:行` 引用，不分发 APK、原始响应、频响曲线、
+壁纸或其他厂商版权素材；快照更新仅通过人工再蒸馏提交完成，运行时零外联。
+
 ## ScrewVivoTWS
 
 - moculll/ScrewVivoTWS: <https://github.com/moculll/ScrewVivoTWS>
@@ -209,6 +222,19 @@ HyperEars 端到端实机验证复核。Channel 16、短模式帧和模式值的
 `ControlAppCatalog`、`scope.list` 与[控制 App 目录](docs/control-apps.md)中，不作为耳机
 品牌或型号的识别证据。HyperEars 不随 APK 分发华为应用、反编译产物、固件、抓包文件、
 图片或品牌资源；所有商标、产品名称归其各自权利人所有。
+
+## GalaxyBudsClient / Samsung Galaxy Buds protocol research
+
+- timschneeb/GalaxyBudsClient: <https://github.com/timschneeb/GalaxyBudsClient>
+- Reviewed release: `5.1.2`（用户提供的源码归档，修订标识 `b39e90c`）
+- Family expansion review: `754b6fdfb1c151b022cece775c8aaad4eb185afa`（2026-10-03）
+- Upstream license: GNU GPL-3.0
+
+用于核对 Galaxy Buds2 Pro 的 RFCOMM UUID、`FD/ DD` 帧、CRC16-XMODEM、扩展状态字段、
+三态降噪与设置命令。HyperEars 在自身 WireCodec、ProtocolSession 和 Adapter 边界中重新组织
+实现；Fix25 同时核对 Live / Pro 的传统 SPP、布尔 ANC 与触控锁，以及新款共同长按字段。
+Core / Buds3 FE 的参考布局仍有 TODO，不把家族外推记为实测，不分发参考二进制或固件。
+不分发上游应用、界面、图片或三星品牌资源。
 
 ## Android and LSPosed APIs
 

@@ -37,6 +37,15 @@ class ControlAppArbitrationTest {
             listOf(ControlAppCatalog.moondrop),
             MoondropPuddingAdapter().controlApps,
         )
+        assertEquals(
+            listOf(ControlAppCatalog.galaxyWearable, ControlAppCatalog.galaxyBuds2ProManager,
+                ControlAppCatalog.galaxyBudsUnified),
+            SamsungBuds2ProAdapter().controlApps,
+        )
+        assertEquals(
+            listOf(ControlAppCatalog.moondrop),
+            MoondropMirageAdapter().controlApps,
+        )
         assertTrue(StandardEarbudAdapter().controlApps.isEmpty())
     }
 

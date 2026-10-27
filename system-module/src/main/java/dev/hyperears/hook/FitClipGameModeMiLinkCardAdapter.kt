@@ -1,10 +1,7 @@
 package dev.hyperears.hook
 
-import android.content.Context
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageView
-import android.widget.LinearLayout
 import android.widget.TextView
 import dev.hyperears.integration.EdifierControlRequest
 import dev.hyperears.integration.EdifierGameModeFeatureState
@@ -127,14 +124,8 @@ internal object FitClipUltraGameModeMiLinkCardAdapter : MiLinkCardAdapter {
     }
 
     private class NativeAncHost(
-        val generation: String,
         title: TextView,
-        container: LinearLayout,
-        originals: List<View>,
-        val standardSource: View,
-        val gameSource: View,
-        private val itemTextId: String,
-        private val itemIconId: String,
+        row: NativeAncModeRow,
     ) {
         private data class OriginalItem(
             val view: View,
@@ -143,49 +134,26 @@ internal object FitClipUltraGameModeMiLinkCardAdapter : MiLinkCardAdapter {
             val visibility: Int,
         )
 
+        private val layout = row.layout
+        val generation: String = layout.logName
+        val standardSource: View = row.item(NoiseMode.OFF)
+        val gameSource: View = row.item(NoiseMode.ANC)
+
         private val title = WeakReference(title)
-        private val container = WeakReference(container)
+        private val container = WeakReference(row.container)
         private val originalTitle = title.text
-        private val originals = originals.map { item ->
+        private val originals = row.items.map { item ->
             OriginalItem(
                 view = item,
-                index = container.indexOfChild(item),
+                index = row.container.indexOfChild(item),
                 layoutParams = item.layoutParams,
                 visibility = item.visibility,
             )
         }
         private val replacements = mutableListOf<WeakReference<View>>()
 
-        fun createItem(root: View, source: View, label: String): View? = runCatching {
-            val item = source.javaClass
-                .getConstructor(Context::class.java)
-                .newInstance(root.context) as View
-            item.id = source.id
-            item.layoutParams = source.layoutParams.nativeCopy()
-            item.visibility = View.VISIBLE
-            item.isSaveEnabled = false
-            item.contentDescription = label
-
-            val targetText = requireNotNull(item.findMiLinkView(itemTextId) as? TextView) {
-                "native item text unavailable: $itemTextId"
-            }
-            targetText.text = label
-            targetText.contentDescription = label
-
-            val sourceIcon = source.findMiLinkView(itemIconId) as? ImageView
-            val targetIcon = requireNotNull(item.findMiLinkView(itemIconId) as? ImageView) {
-                "native item icon unavailable: $itemIconId"
-            }
-            targetIcon.setImageDrawable(
-                sourceIcon?.drawable?.constantState
-                    ?.newDrawable(root.resources)
-                    ?.mutate()
-                    ?: sourceIcon?.drawable,
-            )
-            item
-        }.onFailure {
-            ModuleLog.warn(COMPONENT, "native game-mode item construction failed", it)
-        }.getOrNull()
+        fun createItem(root: View, source: View, label: String): View? =
+            layout.createItem(root, source, label)
 
         fun install(standard: View, game: View) {
             val title = title.get() ?: return
@@ -225,50 +193,11 @@ internal object FitClipUltraGameModeMiLinkCardAdapter : MiLinkCardAdapter {
     }
 
     private fun resolveNativeHost(root: View): NativeAncHost? =
-        resolveSelectCard(root) ?: resolveOriginalCard(root)
-
-    private fun resolveOriginalCard(root: View): NativeAncHost? {
-        val title = root.findMiLinkView(ORIGINAL_TITLE_ID) as? TextView ?: return null
-        val container = root.findMiLinkView(ORIGINAL_CARD_ID) as? LinearLayout ?: return null
-        val transparency = root.findMiLinkView(ORIGINAL_TRANSPARENCY_ID) ?: return null
-        val noise = root.findMiLinkView(ORIGINAL_NOISE_ID) ?: return null
-        val off = root.findMiLinkView(ORIGINAL_OFF_ID) ?: return null
-        val items = listOf(transparency, noise, off)
-        if (items.any { item ->
-                item.parent !== container || item.javaClass.name != ORIGINAL_ITEM_CLASS
-            }
-        ) {
-            return null
+        listOf(NativeAncModeLayout.SELECT_CARD, NativeAncModeLayout.ORIGINAL).firstNotNullOfOrNull { layout ->
+            val row = NativeAncModeRow.resolve(root, layout) ?: return@firstNotNullOfOrNull null
+            val title = root.findMiLinkView(layout.titleId) as? TextView ?: return@firstNotNullOfOrNull null
+            NativeAncHost(title, row)
         }
-        return NativeAncHost(
-            generation = "original",
-            title = title,
-            container = container,
-            originals = items,
-            standardSource = off,
-            gameSource = noise,
-            itemTextId = ORIGINAL_ITEM_TEXT_ID,
-            itemIconId = ORIGINAL_ITEM_ICON_ID,
-        )
-    }
-
-    private fun resolveSelectCard(root: View): NativeAncHost? {
-        val title = root.findMiLinkView(SELECT_TITLE_ID) as? TextView ?: return null
-        val container = root.findMiLinkView(SELECT_CARD_ID) as? LinearLayout ?: return null
-        if (container.javaClass.name != SELECT_CARD_CLASS || container.childCount != 3) return null
-        val items = (0 until container.childCount).map(container::getChildAt)
-        if (items.any { it.javaClass.name != SELECT_ITEM_CLASS }) return null
-        return NativeAncHost(
-            generation = "select-card",
-            title = title,
-            container = container,
-            originals = items,
-            standardSource = items[2],
-            gameSource = items[1],
-            itemTextId = SELECT_ITEM_TEXT_ID,
-            itemIconId = SELECT_ITEM_ICON_ID,
-        )
-    }
 
     private fun View.setNativeChoiceEnabled(enabled: Boolean) {
         isEnabled = enabled
@@ -282,36 +211,11 @@ internal object FitClipUltraGameModeMiLinkCardAdapter : MiLinkCardAdapter {
         for (index in 0 until childCount) getChildAt(index).setSelectedTree(selected)
     }
 
-    private fun ViewGroup.LayoutParams.nativeCopy(): ViewGroup.LayoutParams = when (this) {
-        is LinearLayout.LayoutParams -> LinearLayout.LayoutParams(this)
-        is ViewGroup.MarginLayoutParams -> ViewGroup.MarginLayoutParams(this)
-        else -> ViewGroup.LayoutParams(this)
-    }
-
     private const val COMPONENT = "MiLinkUi"
     private const val GAME_MODE_LABEL = "游戏模式"
     private const val STANDARD_MODE_LABEL = "标准模式"
     private const val ENABLED_ALPHA = 1.0f
     private const val DISABLED_ALPHA = 0.45f
-
-    private const val ORIGINAL_TITLE_ID = "anc_card_title"
-    private const val ORIGINAL_CARD_ID = "anc_card"
-    private const val ORIGINAL_TRANSPARENCY_ID = "anc_clear"
-    private const val ORIGINAL_NOISE_ID = "anc_noise_cancel"
-    private const val ORIGINAL_OFF_ID = "anc_off"
-    private const val ORIGINAL_ITEM_TEXT_ID = "anc_title"
-    private const val ORIGINAL_ITEM_ICON_ID = "anc_icon"
-    private const val ORIGINAL_ITEM_CLASS =
-        "com.miui.circulate.world.headset.ui.HeadsetControlAncItemView"
-
-    private const val SELECT_TITLE_ID = "anc_card_text"
-    private const val SELECT_CARD_ID = "anc_select_card"
-    private const val SELECT_ITEM_TEXT_ID = "tools_text"
-    private const val SELECT_ITEM_ICON_ID = "tools_icon"
-    private const val SELECT_CARD_CLASS =
-        "com.miui.circulate.world.headset.ui.HeadsetSelectCardView"
-    private const val SELECT_ITEM_CLASS =
-        "com.miui.circulate.world.headset.ui.HeadsetSelectItemView"
 }
 
 internal object FitClipGameModeCardPolicy {

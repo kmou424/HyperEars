@@ -16,6 +16,8 @@ import dev.hyperears.integration.EarbudState
 import dev.hyperears.integration.FeatureStateTransport
 import dev.hyperears.integration.DeviceLifecycle
 import dev.hyperears.integration.HeadsetFormFactor
+import dev.hyperears.integration.HeadsetArtwork
+import dev.hyperears.integration.HeadsetArtworkTransport
 import dev.hyperears.integration.MiLinkCardPresentationId
 import dev.hyperears.integration.NoiseMode
 import dev.hyperears.integration.TransportKind
@@ -42,6 +44,7 @@ object ModuleContract {
     const val MODULE_PACKAGE = "dev.hyperears"
     const val BLUETOOTH_PACKAGE = "com.android.bluetooth"
     const val MILINK_PACKAGE = "com.milink.service"
+    const val NATIVE_HEADSET_PACKAGE = "com.xiaomi.bluetooth"
 
     private const val EXTRA_REPLY_PACKAGE = "reply_package"
     private const val EXTRA_SESSION_TOKEN = "session_token"
@@ -52,6 +55,7 @@ object ModuleContract {
     private const val EXTRA_ADAPTER_RESOLUTION = "adapter_resolution"
     private const val EXTRA_ADAPTER_BATTERY_SOURCE = "adapter_battery_source"
     private const val EXTRA_ADAPTER_FORM_FACTOR = "adapter_form_factor"
+    private const val EXTRA_ADAPTER_ARTWORK = "adapter_artwork"
     private const val EXTRA_ADAPTER_PRESENTATION = "adapter_presentation"
     private const val EXTRA_ADAPTER_NOISE_MODES = "adapter_noise_modes"
     private const val EXTRA_ADAPTER_TRANSPORT_KINDS = "adapter_transport_kinds"
@@ -87,6 +91,7 @@ object ModuleContract {
     val stateConsumerPackages = setOf(
         MODULE_PACKAGE,
         MILINK_PACKAGE,
+        NATIVE_HEADSET_PACKAGE,
     )
 
     fun requestState(replyPackage: String): Intent =
@@ -267,6 +272,7 @@ object ModuleContract {
             putExtra(EXTRA_ADAPTER_RESOLUTION, adapter.resolution.name)
             putExtra(EXTRA_ADAPTER_BATTERY_SOURCE, adapter.batterySource.name)
             putExtra(EXTRA_ADAPTER_FORM_FACTOR, adapter.formFactor.name)
+            putExtra(EXTRA_ADAPTER_ARTWORK, HeadsetArtworkTransport.encode(adapter.artwork))
             putExtra(EXTRA_ADAPTER_PRESENTATION, adapter.presentationId?.value)
             putExtra(EXTRA_ADAPTER_NOISE_MODES, adapter.supportedNoiseModes.map(NoiseMode::name).toTypedArray())
             putExtra(EXTRA_ADAPTER_TRANSPORT_KINDS, adapter.transportKinds.map(TransportKind::name).toTypedArray())
@@ -436,6 +442,9 @@ object ModuleContract {
                 ?.let(::MiLinkCardPresentationId),
             transportKinds = transportKinds,
             controlApps = controlApps,
+            artwork = getStringExtra(EXTRA_ADAPTER_ARTWORK)
+                ?.let(HeadsetArtworkTransport::decode)
+                ?: HeadsetArtwork.defaultFor(formFactor),
         )
     }
 }

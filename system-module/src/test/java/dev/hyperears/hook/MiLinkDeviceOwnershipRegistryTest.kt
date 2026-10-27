@@ -78,6 +78,17 @@ class MiLinkDeviceOwnershipRegistryTest {
         assertFalse(MiLinkDeviceOwnershipRegistry.isNativeAdmissionAccepted("1"))
     }
 
+    @Test
+    fun serviceErrorsNeverBecomeSystemOwnershipOrAuthorizeNewPresentation() {
+        // Verified MxBluetoothService results: invalid parameter, Bluetooth off, not bound, IPC error.
+        listOf<Any?>(2, 3, 4, -1, null, "0").forEach { result ->
+            val registry = MiLinkDeviceOwnershipRegistry()
+            assertEquals(Owner.UNKNOWN, registry.observeNativeAdmission(ADDRESS, result, true).owner)
+            assertFalse(MiLinkDeviceOwnershipRegistry.isNativeAdmissionAccepted(result))
+            assertFalse(MiLinkDeviceOwnershipRegistry.isNativeAdmissionRejected(result))
+        }
+    }
+
     private companion object {
         const val ADDRESS = "AA:BB:CC:DD:EE:FF"
     }

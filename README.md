@@ -9,14 +9,14 @@
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
 
 HyperEars 是面向 Xiaomi HyperOS 的第三方蓝牙耳机系统集成模块。它让受支持的
-vivo / iQOO、OPPO Enco、Technics、Bose、Edifier、StarRing、ROSESELSA、NiceHCK、水月雨、荣耀、华为、QCY 和 Sony 耳机
+vivo / iQOO、OPPO Enco、Technics、Bose、Edifier、StarRing、ROSESELSA、NiceHCK、水月雨、荣耀、华为、QCY、Sony 和 Samsung 耳机
 进入 MiLink 融合设备中心，并在不接管 Android 音频路由的前提下补充电量、降噪状态和
 设备流转所需的兼容信息。
 
 > [!WARNING]
 > HyperEars 依赖 root、LSPosed 和 HyperOS 私有接口。安装前请确认能够恢复系统；ROM
 > 更新可能暂时破坏兼容性。本项目与 Xiaomi、vivo、iQOO、OPPO、Bose、Edifier、
-> Panasonic、Technics、ROSESELSA、NiceHCK、水月雨、荣耀、华为、QCY、Sony 及相关品牌无关。
+> Panasonic、Technics、ROSESELSA、NiceHCK、水月雨、荣耀、华为、QCY、Sony、Samsung 及相关品牌无关。
 
 ## 能做什么
 
@@ -24,16 +24,20 @@ vivo / iQOO、OPPO Enco、Technics、Bose、Edifier、StarRing、ROSESELSA、Nic
 
 - 将符合条件的第三方耳机接入 MiLink 融合设备中心，提供设备流转和系统音量。
 - 对没有私有协议适配的标准 A2DP/HFP 耳机，提供同样的流转、音量和 Android 系统整机电量回退。
+- 连接时可显示系统电量弹窗或超级岛；默认“智能”按系统判断在桌面显示弹窗、在应用内显示
+  超级岛，也可选仅弹窗、仅超级岛或关闭。
+- 可独立开启耳机电量通知，查看当前电量、打开耳机设置或断开连接。
+  新增展示需勾选 `com.xiaomi.bluetooth` 作用域，实机基线为 HyperOS 4。
 
 ### 设备能力
 
 - 按耳机形态和已确认的协议提供电量：左右耳与充电盒、头戴式整机，或 Android 系统整机。
 - 仅在私有协议确认成功后发布降噪、关闭、通透和型号专属模式；未确认时不发布对应的私有控制。
-- 支持旧版 HyperOS 与 HyperOS 4 的原生三态耳机卡片；已确认的抗风噪能力作为降噪分支开关
-  呈现，不替换系统原生模式按钮。
+- 支持旧版 HyperOS 与 HyperOS 4 的原生三态耳机卡片；抗风噪按型号使用降噪分支开关，
+  或复用该型号不适用的原生模式槽位。
 - 已开放噪声控制的设备可点击 HyperEars 主页会话卡片中的“模式”指标，从下拉列表切换模式。
-- MiLink 耳机卡片的“更多设置”可选择打开真实蓝牙设备详情、对应厂商控制 App 或 HyperEars；
-  厂商 App 不可用时自动回退到系统设备详情。
+- MiLink 耳机卡片的“更多设置”、电量通知和连接弹窗的内容区共用打开目标：真实蓝牙设备详情、
+  对应厂商控制 App 或 HyperEars；目标不可用时自动回退到系统设备详情。
 
 ### 会话与控制权
 
@@ -71,12 +75,13 @@ GATT、RFCOMM 或 BR/EDR L2CAP 控制通道只为需要协议遥测的适配器�
 | Edifier / 漫步者 | W860NB PRO、花再 Evo Pro、FitClip Ultra、FitBuds Turbo 实机验证；其余家族外推 | 头戴整机、TWS 组件或聚合电量 | 按型号提供降噪、关闭、通透、抗风噪；FitClip Ultra 仅游戏模式，Turbo 另有游戏模式 |
 | ROSESELSA / 弱水时砂 | Furina Endless Solo of Solitude、ROSE Ceramics Ultra 实机验证；两个型号公开实现；产品线家族外推；其余标准回退 | 协议确认后私有组件电量；回退设备使用系统整机电量 | 协议确认后支持降噪、关闭、通透、抗风噪 |
 | NiceHCK / YuanDao | OriG in 公开实现；其他标准回退 | 协议确认后私有组件电量；回退设备使用系统整机电量 | OriG in 支持降噪、关闭、通透、抗风噪 |
-| MOONDROP / 水月雨 | Robin 公开协议；Pudding 实机验证；其他标准回退 | Robin 协议确认后提供左右耳电量；Pudding 协议确认后提供左右耳与充电盒电量，回退设备使用系统整机电量 | Robin 协议确认后支持降噪、关闭、通透；Pudding 实机验证后支持降噪、关闭、通透 |
+| MOONDROP / 水月雨 | Robin 公开协议；Pudding 实机验证；MIRAGE 原版部分实测、维护版待复核；其他标准回退 | Robin 私有左右耳电量；Pudding / MIRAGE 私有左右耳与充电盒电量；均由有效响应确认，回退设备使用系统整机电量 | 降噪、关闭、通透；MIRAGE 新档位待确认 |
 | 荣耀 | X5s Pro 实机验证；其他标准回退 | X5s Pro 协议确认后提供私有组件电量；回退设备使用系统整机电量 | X5s Pro 协议确认后支持降噪、关闭、通透 |
 | 华为 | FreeBuds 5i、FreeBuds Pro 3 实机验证；FreeBuds 4 公开实现；FreeBuds / FreeClip / FreeLace 家族探测；其余标准回退 | 合法协议响应后提供私有组件或整机电量；回退设备使用系统整机电量 | 5i、Pro 3 支持三态；Pro 3 另有型号专属档位；FreeBuds 4 支持降噪、关闭；家族候选在协议确认后支持三态，不开放档位 |
 | QCY | Crossky C50S 公开协议；同协议家族探测；其余标准回退 | 协议确认后提供私有组件电量；回退设备使用系统整机电量 | 协议确认后支持降噪、关闭、通透 |
 | Technics EAH-AZ TWS | AZ80 实机验证；其他型号采用公开实现，参考实现由贡献者在 AZ60、AZ80、AZ100 等型号验证 | 协议确认后提供私有组件电量 | 合法模式状态响应后支持降噪、关闭、通透；AZ80 已完成三态写入和设备回读实测 |
 | Sony | 公开实现、家族外推、标准回退 | 按设备形态提供私有整机、私有组件或系统整机电量 | 按具体型号开放表中明确列出的模式 |
+| Samsung Galaxy Buds | Buds2 Pro 原版实测、维护版待复核；其他型号参考实现或家族外推 | 有效响应确认后提供私有组件电量；未确认时使用系统整机电量 | 按型号及有效回报提供降噪、关闭、环境声；Live、Buds3、Buds4 为降噪与关闭 |
 | 其他标准 A2DP/HFP 耳机 | 标准回退 | 系统整机电量 | 无 |
 
 所有条目均提供设备流转和系统音量。“公开实现”“参考协议”和“家族外推”均不等于
@@ -91,6 +96,7 @@ FitBuds Turbo 的实测证据来自贡献者原版实现；维护后的共享卡
 - Xiaomi HyperOS，Android 15 或更高版本；
 - 已安装并正常工作的 LSPosed，API 版本不低于 101；
 - LSPosed 必选作用域：`com.android.bluetooth`、`com.milink.service`；
+- 使用连接弹窗、超级岛或电量通知时，另需 `com.xiaomi.bluetooth`；
 - 如果要启用“运行时退避”，还需按
   [控制 App 目录](docs/control-apps.md#2-当前目录)勾选实际安装并使用的控制 App；仅执行
   “更多设置”厂商 App 跳转时，安装且可启动即可；
@@ -110,7 +116,8 @@ FitBuds Turbo 的实测证据来自贡献者原版实现；维护后的共享卡
    ```
 
 3. 安装 APK，在 LSPosed 中启用 HyperEars，并至少确认 `com.android.bluetooth` 和
-   `com.milink.service` 已选中。若使用厂商控制 App 退避，再按
+   `com.milink.service` 已选中。使用连接展示或电量通知时勾选 `com.xiaomi.bluetooth`。
+   若使用厂商控制 App 退避，再按
    [控制 App 目录](docs/control-apps.md#2-当前目录)选择对应且已安装的包名；不要选择
    Settings、System UI 或所有应用。
 4. 重启设备。仅强停 MiLink 不一定会让两个目标进程同时重新加载模块。

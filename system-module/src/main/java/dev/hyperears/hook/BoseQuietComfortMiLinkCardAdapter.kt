@@ -2,9 +2,6 @@ package dev.hyperears.hook
 
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.TextView
 import dev.hyperears.integration.BoseMiLinkPresentationIds
 import dev.hyperears.integration.EarbudState
 import dev.hyperears.integration.MiLinkCardPresentationId
@@ -16,7 +13,6 @@ import java.lang.ref.WeakReference
 internal object BoseQuietComfortMiLinkCardAdapter : MiLinkCardAdapter by BoseWindSlotCardAdapter(
     presentationId = BoseMiLinkPresentationIds.WIND_REPLACES_OFF,
     replacedMode = NoiseMode.OFF,
-    replacedViewId = ANC_OFF_ID,
 ) {
     internal fun isModeSelected(itemMode: NoiseMode, currentMode: NoiseMode?): Boolean =
         itemMode == currentMode
@@ -26,7 +22,6 @@ internal object BoseQuietComfortMiLinkCardAdapter : MiLinkCardAdapter by BoseWin
 internal object BoseAnrMiLinkCardAdapter : MiLinkCardAdapter by BoseWindSlotCardAdapter(
     presentationId = BoseMiLinkPresentationIds.WIND_REPLACES_TRANSPARENCY,
     replacedMode = NoiseMode.TRANSPARENCY,
-    replacedViewId = ANC_TRANSPARENCY_ID,
 )
 
 /** Quiet/Aware devices have no verified Off command, so the native item remains visibly disabled. */
@@ -38,7 +33,7 @@ internal object BoseTwoModeMiLinkCardAdapter : MiLinkCardAdapter {
         address: String,
         environment: MiLinkCardEnvironment,
     ): MiLinkCardBinding? {
-        val off = root.findMiLinkView(ANC_OFF_ID) ?: return null
+        val off = NativeAncModeRow.resolve(root)?.item(NoiseMode.OFF) ?: return null
         val originalEnabled = off.isEnabled
         val originalClickable = off.isClickable
         val originalAlpha = off.alpha
@@ -67,7 +62,6 @@ internal object BoseTwoModeMiLinkCardAdapter : MiLinkCardAdapter {
 private class BoseWindSlotCardAdapter(
     override val presentationId: MiLinkCardPresentationId,
     private val replacedMode: NoiseMode,
-    private val replacedViewId: String,
 ) : MiLinkCardAdapter {
     override fun projectNativeNoiseMode(mode: NoiseMode?): NoiseMode? = when (mode) {
         NoiseMode.WIND -> replacedMode
@@ -79,37 +73,18 @@ private class BoseWindSlotCardAdapter(
         address: String,
         environment: MiLinkCardEnvironment,
     ): MiLinkCardBinding? {
-        val ancCard = root.findMiLinkView(ANC_CARD_ID) as? LinearLayout ?: return null
-        val transparency = root.findMiLinkView(ANC_TRANSPARENCY_ID) ?: return null
-        val noiseCancellation = root.findMiLinkView(ANC_NOISE_CANCELLATION_ID) ?: return null
-        val off = root.findMiLinkView(ANC_OFF_ID) ?: return null
-        val replaced = root.findMiLinkView(replacedViewId) ?: return null
-        if (listOf(transparency, noiseCancellation, off).any { it.parent !== ancCard }) return null
-
-        val wind = createNativeMiLinkAncItem(
-            context = root.context,
-            hostClassLoader = environment.hostClassLoader,
-            layoutTemplate = replaced,
-        ) ?: return null
-        val windTitle = wind.findMiLinkView(ANC_TITLE_ID) as? TextView ?: return null
-        val windIcon = wind.findMiLinkView(ANC_ICON_ID) as? ImageView ?: return null
-        val noiseIcon =
-            noiseCancellation.findMiLinkView(ANC_ICON_ID) as? ImageView ?: return null
+        val row = NativeAncModeRow.resolve(root) ?: return skipped(address, "native-mode-row-unavailable")
+        val ancCard = row.container
+        val transparency = row.item(NoiseMode.TRANSPARENCY)
+        val noiseCancellation = row.item(NoiseMode.ANC)
+        val off = row.item(NoiseMode.OFF)
+        val replaced = row.item(replacedMode)
+        val wind = row.createItem(root, replaced, WIND_LABEL, iconSource = noiseCancellation)
+            ?: return skipped(address, "native-wind-item-construction-failed")
 
         val index = ancCard.indexOfChild(replaced).takeIf { it >= 0 } ?: return null
         val originalLayoutParams = replaced.layoutParams
         val originalVisibility = replaced.visibility
-        wind.id = replaced.id
-        windTitle.text = WIND_LABEL
-        windIcon.setImageDrawable(
-            noiseIcon.drawable?.constantState
-                ?.newDrawable(root.resources)
-                ?.mutate()
-                ?: noiseIcon.drawable,
-        )
-        wind.contentDescription = WIND_LABEL
-        wind.visibility = View.VISIBLE
-        wind.isSaveEnabled = false
 
         ancCard.removeViewAt(index)
         ancCard.addView(wind, index)
@@ -128,8 +103,18 @@ private class BoseWindSlotCardAdapter(
             environment = environment,
         )
         wind.setOnClickListener { binding.onWindClick() }
-        ModuleLog.debug("MiLinkUi", "bound Bose native wind mode presentation")
+        ModuleLog.debug("MiLinkUi") {
+            "bound Bose native wind mode layout=${row.layout.logName} slot=$replacedMode " +
+                "address=${maskBluetoothAddress(address)}"
+        }
         return binding
+    }
+
+    private fun skipped(address: String, reason: String): MiLinkCardBinding? {
+        ModuleLog.debug("MiLinkUi") {
+            "skipped Bose native wind mode reason=$reason address=${maskBluetoothAddress(address)}"
+        }
+        return null
     }
 
     private class Binding(
@@ -146,7 +131,8 @@ private class BoseWindSlotCardAdapter(
         private val environment: MiLinkCardEnvironment,
     ) : MiLinkCardBinding {
         private val parent = WeakReference(parent)
-        private val replaced = WeakReference(replaced)
+        // Keep the detached native item alive until unbind so restoration survives GC.
+        private var replaced: View? = replaced
         private val transparency = WeakReference(transparency)
         private val noiseCancellation = WeakReference(noiseCancellation)
         private val off = WeakReference(off)
@@ -178,7 +164,7 @@ private class BoseWindSlotCardAdapter(
         override fun unbind() {
             val parent = parent.get() ?: return
             val wind = wind.get() ?: return
-            val replaced = replaced.get() ?: return
+            val replaced = replaced ?: return
             if (wind.parent !== parent) return
 
             wind.setOnClickListener(null)
@@ -188,6 +174,7 @@ private class BoseWindSlotCardAdapter(
                 replaced.visibility = originalVisibility
                 parent.addView(replaced, originalIndex.coerceAtMost(parent.childCount))
             }
+            this.replaced = null
         }
     }
 
@@ -210,12 +197,6 @@ private class UnbindingCardBinding(
 private fun MiLinkCardBinding.withUnbind(block: () -> Unit): MiLinkCardBinding =
     UnbindingCardBinding(renderBlock = ::render, unbindBlock = block)
 
-private const val ANC_CARD_ID = "anc_card"
-private const val ANC_TRANSPARENCY_ID = "anc_clear"
-private const val ANC_NOISE_CANCELLATION_ID = "anc_noise_cancel"
-private const val ANC_OFF_ID = "anc_off"
-private const val ANC_TITLE_ID = "anc_title"
-private const val ANC_ICON_ID = "anc_icon"
 private const val WIND_LABEL = "抗风噪"
 private const val ENABLED_ALPHA = 1.0f
 private const val DISABLED_ALPHA = 0.45f
