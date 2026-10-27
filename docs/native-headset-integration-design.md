@@ -295,6 +295,7 @@ Controller 建立有效的窗口绑定。其他实例立即执行原实现。
 | `MiuiAirPodsFastConnectController.getAirPodsState(String)` | 当前窗口且地址一致时，返回已有快照的原生格式 | 不 Hook ContentProvider，不写设备缓存 |
 | `MiuiAirPodsFastConnectController.loadDynamicPicture(String)` | 当前窗口使用原生静态资源初始化，跳过 Apple 云图片下载 | 不修改原生全局资源目录 |
 | `MiuiAirPodsFastConnectController.initParameter()` | 通过原生图片字段提供 Adapter 声明的耳机／盒图 | 不修改 View 树；缺失图片按形态回退 |
+| `MiuiAirPodsFastConnectController.setConnectDeviceDialog(int)` | 原生窗口创建后，为本 Controller 的内容字段 `mView` 绑定设置跳转 | 仅模块有效窗口且内容无原生点击动作时绑定；布局替换、关闭和销毁时撤销并恢复属性 |
 | `MiuiAirPodsFastConnectController.setConnectSuccessLayoutDetail(View)` | 原生绘制后按已知盒电量调整盒图片、电量区域的可见性 | 仅有效绑定的当前根视图；明确资源名及控件类型校验失败时保留原生行为 |
 | `MiuiAirPodsFastConnectController.onActivityDestroy()` | 先执行原注销、解绑和资源清理，再撤销授权与所有绑定引用 | `finally` 释放，旧回调不能再次刷新 |
 
@@ -304,7 +305,7 @@ Controller 建立有效的窗口绑定。其他实例立即执行原实现。
 这些新增路径和资源 Hook 需要完整测试包复核。入口依赖字段包括：
 `mActivityContext`、`mFastConnectServiceConnection`、`mFastConnectClientCallBack`、`mAirPodsInfo`，
 以及 native interface / callback 的完整方法签名。缺少任一必需成员时，不开放这一弹窗后端。
-实验截图读取 `mAlert` 和绘制 View 仅供验证，不进入正式 Hook 列表。
+实验用的截图绘制不进入正式实现；内容点击只使用已确认的 Controller 字段，不扫描 View 树。
 
 ### 5.2 窗口专属的本地服务接口
 
@@ -398,6 +399,12 @@ Controller 的初始化、getter 和 callback 统一读取当前绑定的同一�
 扫描布局结构或延迟修改。未知盒电量恢复隐藏；原生图片、电量文字和充电图标保持原实现。
 真实 Apple 窗口不进入这项处理。入口或布局失配时，只停止盒区域扩展，保留原生弹窗。
 
+点击本模块弹窗的耳机／电量内容区时，`HeadsetSettingsNavigator` 使用当前绑定的已接受状态及
+最新“点击卡片‘更多设置’”选项打开目标，成功后通过原生关闭 callback 结束窗口。
+原生关闭按钮、重试按钮和窗口外点击保留原有动作。内容字段不可用或已有原生点击监听时，
+跳过新增导航；不影响电量显示。重新创建单电量／双耳布局时先移除旧监听再绑定新内容，
+关闭或销毁时移除监听并恢复原点击与焦点属性，旧窗口不能再发起跳转。
+
 `2.8.0-native-test.4` 的 vivo TWS Air3 Pro 实测再次确认：左右耳 100%、盒 99%、
 两耳充电标志均为 false 时，数据已进入窗口回调，原生仍隐藏盒区域；这正是 `.5` 的修复场景。
 连接超级岛的原生
@@ -410,6 +417,7 @@ Controller 的初始化、getter 和 callback 统一读取当前绑定的同一�
 | 条件 | 处理 |
 | --- | --- |
 | 用户点击原生关闭按钮、原生 Dialog dismiss | 原 Controller 结束 Activity；解绑、注销与授权释放随后执行 |
+| 点击本模块内容区并成功打开设置目标 | 撤销内容点击，通过原生 callback 关闭当前窗口 |
 | Activity 退到后台 | 原 `onActivityStop` 发出前台状态通知，本地接口调用当前窗口的关闭 callback；已实测 |
 | 真实断开、蓝牙关闭、暂停、系统接管或状态生产者死亡 | 展示协调器撤销当前绑定，通过同一个原生 callback 关闭；其中展示断开已用合成事件验证 |
 | 旧版本、旧会话和已销毁窗口的更新 | 丢弃，不重新创建窗口 |
@@ -438,8 +446,9 @@ Controller 中的连接超时消息也不能当作已连接电量窗口的固定
 - 真实断开、关闭设置、暂停模块时清理模块拥有的通知与回调。
 - 系统接管时停止提交；仅在确认仍为模块创建的实例时清理，避免取消系统新接管的通知。
 - 原生“断开”使用经过核实的系统断开路径，不经私有 Socket，也不为执行动作补造 MMA 支持。
-- 原生“详情”打开该地址对应的系统蓝牙设备详情，抽取并复用当前通用导航实现。
-  既有“点击卡片‘更多设置’”偏好继续只作用于卡片，不隐式改变通知动作。
+- 原生“详情”复用 `HeadsetSettingsNavigator`，按“点击卡片‘更多设置’”的当前选择打开
+  该地址对应的系统蓝牙详情、厂商 App 或 HyperEars；目标不可用时回退到系统蓝牙详情。
+  点击前核对通知实例、连接代号、当前归属、会话和设置，系统接管的同名通知不被覆盖。
 
 `checkSupport` 的原生条件与创建／取消并不对称。若需要扩大它，仅允许在这个通知组件内，
 针对当前模块拥有且明确登记的地址处理，并覆盖关闭后的清理阶段；
@@ -449,7 +458,7 @@ Controller 中的连接超时消息也不能当作已连接电量窗口的固定
 早期实验按精确 APK 直接调用验证了通知创建与取消缺口。分支实现使用 DEX 唯一指纹，
 不记录混淆类／方法名称。原生单设备取消在本次调用内获得同一展示资格；删除 Intent 和
 对应的原生设备缓存清理由宿主负责，不再安装模块的通知删除 Hook 或删除广播接收器。
-通知详情跳转复用卡片已有的系统蓝牙详情导航。断开动作保留原生处理。
+通知详情跳转复用卡片的目标选择与回退逻辑。断开动作保留原生处理。
 创建前保护原来已有的通知，取消前核对当前通知的发布时间；系统接管时放弃修改同名原生实例。
 上述新实现尚需实机验证其点击、划掉、断开和接管行为。
 

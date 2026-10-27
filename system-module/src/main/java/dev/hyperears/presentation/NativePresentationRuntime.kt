@@ -18,6 +18,7 @@ import android.os.UserManager
 import android.provider.Settings
 import dev.hyperears.bridge.BroadcastIdentity
 import dev.hyperears.bridge.DeviceStateRegistry
+import dev.hyperears.bridge.HeadsetSettingsNavigator
 import dev.hyperears.bridge.ModuleContract
 import dev.hyperears.bridge.NativePresentationContract
 import dev.hyperears.hook.HookContext
@@ -137,6 +138,7 @@ internal class NativePresentationRuntime(
             AirPodsWindowBridge(context,
                 onOpened = { id, token -> sendWindowEvent(id, token) },
                 onClosed = { id -> sendWindowEvent(id, null) },
+                openSettings = ::openHeadsetSettings,
             ).also { configure(it, loader); it.install() }
         }.onSuccess { windowBridge = it }
             .onFailure { ModuleLog.warn(TAG, "native popup unavailable", it) }
@@ -221,7 +223,7 @@ internal class NativePresentationRuntime(
                 context.applicationInfo.sourceDir, context.classLoader) }
             handler.post {
                 result.onSuccess { methods ->
-                    runCatching { NativeDetailNotification(context, methods).also {
+                    runCatching { NativeDetailNotification(context, methods, ::openNotificationSettings).also {
                         configure(it, context.classLoader); it.install()
                     } }.onSuccess {
                         details = it
@@ -231,6 +233,20 @@ internal class NativePresentationRuntime(
             }
             executor.shutdown()
         }
+    }
+
+    private fun openNotificationSettings(address: String, connection: String): Boolean {
+        val record = records[address] ?: return false
+        if (record.metadata.connection.id != connection || record.metadata.admission != NativeAdmission.HYPEREARS ||
+            !record.producer.isBinderAlive || !ModuleSettingsRuntime.current.headsetDetailNotification) return false
+        return openHeadsetSettings(context, record.state)
+    }
+
+    private fun openHeadsetSettings(launchContext: Context, state: EarbudState): Boolean {
+        val current = ModuleSettingsRuntime.current
+        val address = state.address ?: return false
+        if (current.modulePaused || !state.sessionActive) return false
+        return HeadsetSettingsNavigator(launchContext).open(address, state, current.moreSettingsTarget)
     }
 
     @SuppressLint("MissingPermission")

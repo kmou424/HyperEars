@@ -26,7 +26,7 @@ vivo / iQOO、OPPO Enco、Technics、Bose、Edifier、StarRing、ROSESELSA、Nic
 - 对没有私有协议适配的标准 A2DP/HFP 耳机，提供同样的流转、音量和 Android 系统整机电量回退。
 - 连接时可显示系统电量弹窗或超级岛；默认“智能”按系统判断在桌面显示弹窗、在应用内显示
   超级岛，也可选仅弹窗、仅超级岛或关闭。
-- 可独立开启耳机电量通知，查看当前电量、打开系统设备详情或断开连接。
+- 可独立开启耳机电量通知，查看当前电量、打开耳机设置或断开连接。
   新增展示需勾选 `com.xiaomi.bluetooth` 作用域，实机基线为 HyperOS 4。
 
 ### 设备能力
@@ -36,8 +36,8 @@ vivo / iQOO、OPPO Enco、Technics、Bose、Edifier、StarRing、ROSESELSA、Nic
 - 支持旧版 HyperOS 与 HyperOS 4 的原生三态耳机卡片；抗风噪按型号使用降噪分支开关，
   或复用该型号不适用的原生模式槽位。
 - 已开放噪声控制的设备可点击 HyperEars 主页会话卡片中的“模式”指标，从下拉列表切换模式。
-- MiLink 耳机卡片的“更多设置”可选择打开真实蓝牙设备详情、对应厂商控制 App 或 HyperEars；
-  厂商 App 不可用时自动回退到系统设备详情。
+- MiLink 耳机卡片的“更多设置”、电量通知和连接弹窗的内容区共用打开目标：真实蓝牙设备详情、
+  对应厂商控制 App 或 HyperEars；目标不可用时自动回退到系统设备详情。
 
 ### 会话与控制权
 

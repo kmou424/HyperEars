@@ -11,6 +11,7 @@ import android.content.IntentFilter
 import android.os.Bundle
 import android.view.View
 import dev.hyperears.bridge.BridgeStage
+import dev.hyperears.bridge.HeadsetSettingsNavigator
 import dev.hyperears.bridge.ModuleContract
 import dev.hyperears.bridge.ModuleRuntimeGate
 import dev.hyperears.bridge.BroadcastIdentity
@@ -27,7 +28,6 @@ import dev.hyperears.integration.NoiseModeFeatureState
 import dev.hyperears.integration.withFeature
 import dev.hyperears.settings.ModuleSettings
 import dev.hyperears.settings.ModuleSettingsRuntime
-import dev.hyperears.settings.MoreSettingsTarget
 import java.io.Closeable
 import java.lang.reflect.Method
 import java.util.Collections
@@ -263,63 +263,10 @@ internal class MiLinkServiceHook : HookContext() {
     }
 
     private fun openPreferredHeadsetSettings(address: String): Boolean {
-        val state = stateForAddress(address)
-        return when (settings.moreSettingsTarget) {
-            MoreSettingsTarget.SYSTEM_SETTINGS -> openBluetoothDeviceSettings(address)
-            MoreSettingsTarget.VENDOR_APP ->
-                openControlApp(state) || openBluetoothDeviceSettings(address)
-            MoreSettingsTarget.HYPEREARS ->
-                openHyperEars() || openBluetoothDeviceSettings(address)
-        }
-    }
-
-    private fun openHyperEars(): Boolean {
         val appContext = context ?: return false
-        val intent = Intent(Intent.ACTION_MAIN)
-            .setClassName(ModuleContract.MODULE_PACKAGE, HYPEREARS_MAIN_ACTIVITY)
-            .addCategory(Intent.CATEGORY_LAUNCHER)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        return runCatching { appContext.startActivity(intent) }
-            .onFailure { ModuleLog.warn("MiLink", "unable to open HyperEars", it) }
-            .isSuccess
-    }
-
-    private fun openControlApp(state: EarbudState): Boolean {
-        val appContext = context ?: return false
-        val adapter = state.adapter ?: return false
-        val candidates = buildList {
-            state.lifecycle.externalControlApp?.let(::add)
-            adapter.controlApps.forEach { candidate ->
-                if (none { it.packageName == candidate.packageName }) add(candidate)
-            }
-        }
-        val launch = candidates.firstNotNullOfOrNull { controlApp ->
-            appContext.packageManager
-                .getLaunchIntentForPackage(controlApp.packageName)
-                ?.let { controlApp to it }
-        } ?: return false
-        val (controlApp, intent) = launch
-        return runCatching {
-            appContext.startActivity(
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
-            )
-        }.onSuccess {
-            ModuleLog.debug(
-                "MiLink",
-                "opened ${controlApp.packageName} for ${maskBluetoothAddress(state.address)}",
-            )
-        }.onFailure {
-            ModuleLog.warn(
-                "MiLink",
-                "unable to open ${controlApp.displayName}",
-                it,
-            )
-        }.isSuccess
-    }
-
-    private fun openBluetoothDeviceSettings(address: String): Boolean {
-        val appContext = context ?: return false
-        return dev.hyperears.bridge.BluetoothDeviceSettings.open(appContext, address)
+        val current = ModuleSettingsRuntime.current
+        if (current.modulePaused) return false
+        return HeadsetSettingsNavigator(appContext).open(address, stateForAddress(address), current.moreSettingsTarget)
     }
 
     /**
@@ -1378,7 +1325,6 @@ internal class MiLinkServiceHook : HookContext() {
     }
 
     private companion object {
-        const val HYPEREARS_MAIN_ACTIVITY = "dev.hyperears.MainActivity"
         const val MILINK_RAW_ANC_NO_TRANSPARENCY = 3
         const val MILINK_RAW_ANC_ALL_MODES = 7
         const val NO_ANC_CAPABILITY = 0

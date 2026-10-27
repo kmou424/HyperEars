@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import java.util.HashSet
 
-/** Destination opened from the MiLink headset card's semantic "more settings" action. */
+/** Shared destination for headset card settings, battery notifications and connection windows. */
 enum class MoreSettingsTarget {
     SYSTEM_SETTINGS,
     VENDOR_APP,

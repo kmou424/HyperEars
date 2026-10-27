@@ -4,7 +4,6 @@ import android.app.NotificationManager
 import android.bluetooth.BluetoothDevice
 import android.content.Context
 import android.content.Intent
-import dev.hyperears.bridge.BluetoothDeviceSettings
 import dev.hyperears.hook.HookContext
 import dev.hyperears.hook.ModuleLog
 import java.util.concurrent.ConcurrentHashMap
@@ -13,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap
 internal class NativeDetailNotification(
     private val context: Context,
     private val methods: NativeDetailNotificationResolver.Methods,
+    private val openSettings: (address: String, connection: String) -> Boolean,
 ) : HookContext() {
     private data class Entry(val device: BluetoothDevice, val projection: NativeHeadsetProjection,
         val connection: String, val postedAt: Long)
@@ -33,9 +33,10 @@ internal class NativeDetailNotification(
             val intent = args[1] as? Intent ?: return@hookBefore
             if (intent.action != "com.android.bluetooth.headset.click.detail_notification") return@hookBefore
             val address = intent.getStringExtra("bluetoothaddress") ?: return@hookBefore
-            if (!entries.containsKey(address)) return@hookBefore
-            BluetoothDeviceSettings.open(context, address)
-            result = null
+            val entry = entries[address] ?: return@hookBefore
+            // A native device may have replaced our notification with the same tag and ID.
+            if (notification(address)?.postTime != entry.postedAt) return@hookBefore
+            if (openSettings(address, entry.connection)) result = null
         }
     }
 

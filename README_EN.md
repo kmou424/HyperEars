@@ -26,7 +26,7 @@ StarRing, ROSESELSA, NiceHCK, MOONDROP, Honor, Huawei, QCY, Sony and Samsung dev
 - Adds native connection popups and island hints. Smart mode is selected by default and uses the
   system's scene check to choose a popup on the home screen or an island hint inside other apps.
   Popup only, Island only and Off are also available.
-- Provides an independent battery notification with device details and the native disconnect action.
+- Provides an independent battery notification with access to headset settings and the native disconnect action.
   These displays require the `com.xiaomi.bluetooth` scope; the hardware test baseline is HyperOS 4.
 - Publishes eligible third-party headsets to the MiLink device center for device handoff and system volume.
 - Provides the same handoff and volume path to standard A2DP/HFP headsets, with Android aggregate-battery fallback.
@@ -37,7 +37,7 @@ StarRing, ROSESELSA, NiceHCK, MOONDROP, Honor, Huawei, QCY, Sony and Samsung dev
 - Publishes noise cancellation, off, transparency and model-specific modes only after private-protocol confirmation; unconfirmed private controls remain unavailable.
 - Supports the stock three-state headset cards used by earlier HyperOS releases and HyperOS 4. Depending on the model, wind-noise control uses an ANC-branch switch or replaces an unsupported native mode slot.
 - Devices with confirmed noise control can select the existing Mode metric on the HyperEars home-page session card and switch modes from its drop-down list.
-- The MiLink card's “More settings” action can open the real Android Bluetooth-device details page, the declared vendor controller, or HyperEars. An unavailable controller falls back to system settings.
+- The MiLink card's “More settings” action, battery notification and connection popup content share one destination setting: the real Android Bluetooth-device details page, the declared vendor controller, or HyperEars. An unavailable destination falls back to system settings.
 
 ### Sessions and ownership
 

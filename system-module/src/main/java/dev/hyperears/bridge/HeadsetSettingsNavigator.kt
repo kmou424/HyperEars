@@ -1,0 +1,58 @@
+package dev.hyperears.bridge
+
+import android.content.Context
+import android.content.Intent
+import dev.hyperears.hook.ModuleLog
+import dev.hyperears.integration.ControlAppSpec
+import dev.hyperears.integration.EarbudState
+import dev.hyperears.settings.MoreSettingsTarget
+
+/** Shared destination policy for module-owned cards, notifications and connection windows. */
+internal class HeadsetSettingsNavigator(
+    private val openSystemSettings: (String) -> Boolean,
+    private val openVendorApp: (List<ControlAppSpec>) -> Boolean,
+    private val openHyperEars: () -> Boolean,
+) {
+    constructor(context: Context) : this(
+        openSystemSettings = { address -> BluetoothDeviceSettings.open(context, address) },
+        openVendorApp = { candidates -> launchVendorApp(context, candidates) },
+        openHyperEars = {
+            launch(context, Intent(Intent.ACTION_MAIN)
+                .setClassName(ModuleContract.MODULE_PACKAGE, "dev.hyperears.MainActivity")
+                .addCategory(Intent.CATEGORY_LAUNCHER), ModuleContract.MODULE_PACKAGE)
+        },
+    )
+
+    /** Callers supply the current preference and accepted state at the time of the click. */
+    fun open(address: String, state: EarbudState?, target: MoreSettingsTarget): Boolean = when (target) {
+        MoreSettingsTarget.SYSTEM_SETTINGS -> openSystemSettings(address)
+        MoreSettingsTarget.VENDOR_APP -> {
+            val current = state?.takeIf { it.address == address }
+            val candidates = buildList {
+                current?.lifecycle?.externalControlApp?.let(::add)
+                current?.adapter?.controlApps?.let(::addAll)
+            }.distinctBy(ControlAppSpec::packageName)
+            (candidates.isNotEmpty() && openVendorApp(candidates)) || openSystemSettings(address)
+        }
+        MoreSettingsTarget.HYPEREARS -> openHyperEars() || openSystemSettings(address)
+    }
+
+    private companion object {
+        const val TAG = "HeadsetSettings"
+
+        fun launchVendorApp(context: Context, candidates: List<ControlAppSpec>): Boolean {
+            val (app, intent) = candidates.firstNotNullOfOrNull { app ->
+                context.packageManager.getLaunchIntentForPackage(app.packageName)?.let { app to it }
+            } ?: return false
+            return launch(context, intent, app.packageName)
+        }
+
+        fun launch(context: Context, intent: Intent, destination: String): Boolean = runCatching {
+            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP))
+        }.onSuccess {
+            ModuleLog.debug(TAG, "opened $destination")
+        }.onFailure {
+            ModuleLog.warn(TAG, "unable to open $destination", it)
+        }.isSuccess
+    }
+}

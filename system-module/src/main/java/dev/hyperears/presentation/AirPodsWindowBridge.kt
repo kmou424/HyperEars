@@ -23,6 +23,7 @@ import dev.hyperears.hook.ModuleLog
 import dev.hyperears.hook.maskBluetoothAddress
 import dev.hyperears.integration.HeadsetArtwork
 import dev.hyperears.integration.EarbudState
+import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import java.util.IdentityHashMap
 
@@ -31,6 +32,7 @@ internal class AirPodsWindowBridge(
     private val context: Context,
     private val onOpened: (String, IBinder) -> Unit,
     private val onClosed: (String) -> Unit,
+    private val openSettings: (Context, EarbudState) -> Boolean,
 ) : HookContext() {
     private val handler = Handler(Looper.getMainLooper())
     private val controllers = IdentityHashMap<Any, Binding>()
@@ -51,11 +53,24 @@ internal class AirPodsWindowBridge(
         var state: EarbudState,
     ) {
         var active = true
+        var closing = false
         var bound = false
         var callback: Any? = null
         var caseVisibilityDisabled = false
+        var navigation: ContentNavigation? = null
         lateinit var binder: Binder
         lateinit var death: IBinder.DeathRecipient
+    }
+
+    private class ContentNavigation(val view: View) {
+        private val clickable = view.isClickable
+        private val focusable = view.isFocusable
+
+        fun release() {
+            view.setOnClickListener(null)
+            view.isClickable = clickable
+            view.isFocusable = focusable
+        }
     }
 
     override fun install() {
@@ -196,8 +211,38 @@ internal class AirPodsWindowBridge(
             try { chain.proceed() } finally { binding?.let(::release) }
         }
         installCaseVisibility()
+        installContentNavigation(symbols.createDialog)
         enabled = true
         ModuleLog.debug(TAG, "native window semantic hooks ready")
+    }
+
+    private fun installContentNavigation(createDialog: Method) {
+        runCatching {
+            val content = NativeMembers.field(controllerType, "mView")
+            require(View::class.java.isAssignableFrom(content.type))
+            hookAfter(createDialog) {
+                val binding = controllers[instance] ?: return@hookAfter
+                if (!binding.active || binding.closing || binding.activity.isFinishing) return@hookAfter
+                runCatching {
+                    val view = content.get(binding.controller) as? View ?: return@runCatching
+                    if (binding.navigation?.view === view) return@runCatching
+                    binding.navigation?.release()
+                    binding.navigation = null
+                    // Only the authorized Controller's content is clickable. Native dialog controls
+                    // (including close/retry) retain their own actions; an existing root action wins.
+                    if (view.hasOnClickListeners()) return@runCatching
+                    binding.navigation = ContentNavigation(view)
+                    view.setOnClickListener {
+                        if (!binding.active || binding.closing || binding.activity.isFinishing ||
+                            !binding.request.producer.isBinderAlive) return@setOnClickListener
+                        runCatching { openSettings(binding.activity, binding.state) }
+                            .onSuccess { if (it) close(binding, "settings opened") }
+                            .onFailure { ModuleLog.warn(TAG, "unable to open headset settings", it) }
+                    }
+                    view.isFocusable = true
+                }.onFailure { ModuleLog.warn(TAG, "native content navigation unavailable", it) }
+            }
+        }.onFailure { ModuleLog.warn(TAG, "native content navigation hook unavailable", it) }
     }
 
     private fun installCaseVisibility() {
@@ -227,7 +272,7 @@ internal class AirPodsWindowBridge(
 
     fun update(state: EarbudState, session: String, metadata: NativePresentationMetadata, producer: IBinder) {
         controllers.values.toList().filter { it.state.address == state.address }.forEach { binding ->
-            if (!binding.active || binding.activity.isFinishing) return@forEach
+            if (!binding.active || binding.closing || binding.activity.isFinishing) return@forEach
             if (producer != binding.request.producer || session != binding.request.session ||
                 metadata.connection.id != binding.request.metadata.connection.id ||
                 metadata.admission != NativeAdmission.HYPEREARS || !state.sessionActive) {
@@ -312,7 +357,10 @@ internal class AirPodsWindowBridge(
         NativeMembers.method(owner.javaClass, method, Int::class.javaPrimitiveType!!).invoke(owner, value)
 
     private fun close(binding: Binding, reason: String) {
-        if (!binding.active || binding.activity.isFinishing) return
+        if (!binding.active || binding.closing || binding.activity.isFinishing) return
+        binding.closing = true
+        binding.navigation?.release()
+        binding.navigation = null
         ModuleLog.debug(TAG, "close address=${maskBluetoothAddress(binding.state.address)} reason=$reason")
         val closed = binding.callback?.let {
             runCatching { callbackType.getMethod("closeDialogForAirPods", String::class.java)
@@ -324,6 +372,8 @@ internal class AirPodsWindowBridge(
     private fun release(binding: Binding) {
         if (!binding.active) return
         binding.active = false
+        binding.navigation?.release()
+        binding.navigation = null
         binding.callback = null
         binding.bound = false
         controllers.remove(binding.controller)

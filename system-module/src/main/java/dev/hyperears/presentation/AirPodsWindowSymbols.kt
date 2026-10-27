@@ -13,6 +13,7 @@ internal class AirPodsWindowSymbols(private val loader: ClassLoader) {
     val callback = type("com.android.bluetooth.ble.app.IFastConnectClientCallBack")
     val create = NativeMembers.method(controller, "onActivityCreate")
     val destroy = NativeMembers.method(controller, "onActivityDestroy")
+    val createDialog = NativeMembers.method(controller, "setConnectDeviceDialog", Int::class.javaPrimitiveType!!)
     val read = NativeMembers.method(controller, "getAirPodsState", String::class.java)
     val build = NativeMembers.method(type("${AirPodsWindowBridge.PREFIX}.airpods.AirPodsInfo"),
         "buildPodsStatus", String::class.java)
@@ -28,7 +29,6 @@ internal class AirPodsWindowSymbols(private val loader: ClassLoader) {
     init {
         require(Dialog::class.java.isAssignableFrom(
             NativeMembers.field(type(NativeWindowRequest.ACTIVITY), "mPairingAlert").type))
-        NativeMembers.method(controller, "setConnectDeviceDialog", Int::class.javaPrimitiveType!!)
         NativeMembers.method(controller, "goToSuitableDialog", Int::class.javaPrimitiveType!!)
         fun field(name: String, expected: Class<*>) {
             require(expected.isAssignableFrom(NativeMembers.field(controller, name).type))
